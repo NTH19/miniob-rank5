@@ -1,5 +1,5 @@
 # include 另外一个cmake 配置
-#INCLUDE(file1 [OPTIONAL])
+# INCLUDE(file1 [OPTIONAL])
 
 cmake_minimum_required(VERSION 3.10)
 set(CMAKE_CXX_STANDARD 14)
