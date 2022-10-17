@@ -42,6 +42,7 @@ public:
 
   RC sync();
 
+  RC drop_table(const char *table_name);
   RC recover();
 
   CLogManager *get_clog_manager();
