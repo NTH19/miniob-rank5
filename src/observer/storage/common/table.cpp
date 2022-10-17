@@ -772,6 +772,7 @@ RC Table::update_record(Trx *trx, Record *record, const char *attribute_name, co
   } else {
     auto f=this->table_meta_.field(attribute_name);
     auto addr=record->data()+f->offset();
+    
     switch (f->type()) {
       case INTS: {
         *(int*)addr = *(int*)new_data;
@@ -787,6 +788,10 @@ RC Table::update_record(Trx *trx, Record *record, const char *attribute_name, co
         if (record_data_size < 4) {
           record_data_size += 1;
         }
+        if (f->len()<record_data_size){
+          return RC::INVALID_ARGUMENT;
+        }
+        
         memcpy(addr,new_data,record_data_size);
       }
       break;
