@@ -862,6 +862,19 @@ RC BplusTreeHandler::close()
   disk_buffer_pool_ = nullptr;
   return RC::SUCCESS;
 }
+RC BplusTreeHandler::drop()
+{
+  if (disk_buffer_pool_ != nullptr) {
+
+    disk_buffer_pool_->drop_file(); 
+
+    delete mem_pool_item_;
+    mem_pool_item_ = nullptr;
+  }
+
+  disk_buffer_pool_ = nullptr;
+  return RC::SUCCESS;
+}
 
 RC BplusTreeHandler::print_leaf(Frame *frame)
 {

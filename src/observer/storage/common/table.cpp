@@ -120,6 +120,27 @@ RC Table::create(
   return rc;
 }
 
+RC Table::drop(
+    const char *path, const char *name, const char *base_dir)
+{
+  BufferPoolManager &bpm = BufferPoolManager::instance();
+  LOG_INFO("Begin to drop table %s:%s", base_dir, name);
+
+  RC rc = RC::SUCCESS;
+  
+  bpm.drop_file(path);
+
+  std::string data_file = table_data_file(base_dir, name);
+  
+  //we don't care the error
+  bpm.drop_file(data_file.c_str());
+  for(int i=0;i<indexes_.size();++i){
+    indexes_[i]->drop();
+    delete indexes_[i];
+  }
+  LOG_INFO("Successfully drop table %s:%s", base_dir, name);
+  return rc;
+}
 RC Table::open(const char *meta_file, const char *base_dir, CLogManager *clog_manager)
 {
   // 加载元数据文件

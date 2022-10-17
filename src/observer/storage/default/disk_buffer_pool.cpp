@@ -245,6 +245,34 @@ RC DiskBufferPool::close_file()
   bp_manager_.close_file(file_name_.c_str());
   return RC::SUCCESS;
 }
+RC DiskBufferPool::drop_file()
+{
+  RC rc = RC::SUCCESS;
+  if (file_desc_ < 0) {
+    return rc;
+  }
+
+  hdr_frame_->pin_count_--;
+  // TODO: 理论上是在回放时回滚未提交事务，但目前没有undo log，因此不下刷数据page，只通过redo log回放
+  if ((rc = purge_page(0)) != RC::SUCCESS) {
+    hdr_frame_->pin_count_++;
+    LOG_ERROR("Failed to close %s, due to failed to purge all pages.", file_name_.c_str());
+    return rc;
+  }
+
+  disposed_pages.clear();
+
+  if (close(file_desc_) < 0) {
+    LOG_ERROR("Failed to close fileId:%d, fileName:%s, error:%s", file_desc_, file_name_.c_str(), strerror(errno));
+    return RC::IOERR_CLOSE;
+  }
+  LOG_INFO("Successfully close file %d:%s.", file_desc_, file_name_.c_str());
+  file_desc_ = -1;
+
+  bp_manager_.drop_file(file_name_.c_str());
+  
+  return RC::SUCCESS;
+}
 
 RC DiskBufferPool::get_this_page(PageNum page_num, Frame **frame)
 {
@@ -668,6 +696,25 @@ RC BufferPoolManager::close_file(const char *_file_name)
 
   int fd = iter->second->file_desc();
   fd_buffer_pools_.erase(fd);
+
+  DiskBufferPool *bp = iter->second;
+  buffer_pools_.erase(iter);
+  delete bp;
+  return RC::SUCCESS;
+}
+RC BufferPoolManager::drop_file(const char *_file_name)
+{
+  std::string file_name(_file_name);
+  auto iter = buffer_pools_.find(file_name);
+  if (iter == buffer_pools_.end()) {
+    LOG_WARN("file has not opened: %s", _file_name);
+    remove(_file_name);
+    return RC::SUCCESS;
+  }
+
+  int fd = iter->second->file_desc();
+  fd_buffer_pools_.erase(fd);
+  remove(_file_name);
 
   DiskBufferPool *bp = iter->second;
   buffer_pools_.erase(iter);
