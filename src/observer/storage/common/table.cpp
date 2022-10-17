@@ -196,7 +196,15 @@ RC Table::commit_insert(Trx *trx, const RID &rid)
 
   return trx->commit_insert(this, record);
 }
+RC Table::commit_update(Trx *trx, const RID &rid) {
+  Record record;
+  RC rc = record_handler_->get_record(&rid, &record);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
 
+  return trx->commit_update(this, record);
+}
 RC Table::rollback_insert(Trx *trx, const RID &rid)
 {
 
@@ -219,6 +227,24 @@ RC Table::rollback_insert(Trx *trx, const RID &rid)
   }
 
   rc = record_handler_->delete_record(&rid);
+  return rc;
+}
+RC Table::rollback_update(Trx *trx, const RID &rid) {
+
+  Record record;
+  RC rc = record_handler_->get_record(&rid, &record);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+
+  // remove all indexes
+  rc = delete_entry_of_indexes(record.data(), rid, false);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to delete indexes of record(rid=%d.%d) while rollback insert, rc=%d:%s",
+              rid.page_num, rid.slot_num, rc, strrc(rc));
+  } else {
+    rc = record_handler_->delete_record(&rid);
+  }
   return rc;
 }
 
@@ -638,10 +664,155 @@ RC Table::create_index(Trx *trx, const char *index_name, const char *attribute_n
   return rc;
 }
 
+class RecordUpdater {
+public:
+  RecordUpdater(Table &table, Trx *trx, const char *attribute_name, const Value value) : 
+    table_(table), trx_(trx), attribute_name_(attribute_name), value_(value) {
+  }
+  RC init() {
+    // init updating attribute feild meta
+    field_meta_ = table_.table_meta().field(attribute_name_);
+    if (field_meta_ == nullptr) {
+      return RC::SCHEMA_FIELD_NOT_EXIST;
+    }
+    if (field_meta_->type() != value_.type) {
+      // When the types are inconsistent, attempt to conversion
+      if (field_meta_->type() == FLOATS && value_.type == INTS) {
+        int int_value;
+        float float_value;
+        memcpy(&int_value, value_.data, sizeof(int));
+        float_value = int_value;
+        memcpy(value_.data, &float_value, sizeof(float));
+        value_.type = FLOATS;
+        return RC::SUCCESS;
+      }
+      return RC::MISMATCH;
+    }
+    return RC::SUCCESS;
+  }
+  RC add_record(Record* record) {
+    records_.push_back(*record);
+  }
+  RC do_update() {
+    RC rc = RC::SUCCESS;
+    int record_size = table_.table_meta().record_size();
+    char *new_record_data = new char[record_size];
+    int record_data_size = 0;
+    switch (field_meta_->type()) {
+      case INTS: {
+        record_data_size = sizeof(int);
+      }
+      break;
+      case FLOATS: {
+        record_data_size = sizeof(float);
+      }
+        break;
+      case CHARS: {
+        // The length of the string before and after modification is different
+        record_data_size = strlen((char*)value_.data);
+        if (record_data_size < 4) {
+          record_data_size += 1;
+        }
+      }
+      break;
+    } 
+    int i = 0;
+    for (Record &record : records_) {
+      // create new record->data
+      memcpy(new_record_data, record.data(), record_size);
+      memcpy(new_record_data + field_meta_->offset(), value_.data, record_data_size);
+      rc = table_.update_record(trx_, &record, attribute_name_, new_record_data);
+      
+    }
+    delete[] new_record_data;
+    return RC::SUCCESS;
+  }
+
+  int updated_count() const {
+    return updated_count_;
+  }
+
+private:
+  Table & table_;
+  Trx *trx_;
+  const char *attribute_name_;
+  Value value_;
+  const FieldMeta *field_meta_;
+  int updated_count_ = 0;
+  std::vector<Record> records_;
+};
+
+RC Table::update_record(Trx *trx, Record *record, const char *attribute_name, const char *new_data) {
+  RC rc = RC::SUCCESS;
+  rc = update_entry_of_indexes(attribute_name, record->data(), &record->rid(), new_data);
+  if (rc != RC::SUCCESS) {
+     LOG_ERROR("Failed to update indexes of record (rid=%d.%d). rc=%d:%s",record->rid().page_num, record->rid().slot_num, rc, strrc(rc));
+    return rc;
+  } else {
+    record->set_data((char *)new_data) ;
+    rc = record_handler_->update_record(record);
+  }
+  return rc;
+}
+RC Table::update_entry_of_indexes(const char *attribute_name, const char *record, const RID *rid, const char *new_data) {
+  RC rc = RC::SUCCESS;
+  Index* index = find_index_by_field(attribute_name);
+  if (index == NULL) {
+    // attribute_name has no index
+    return rc;
+  }
+  rc = index->update_entry(record, rid, new_data);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to update_entry");
+    printf("Failed to update_entry\n");
+  }
+  return rc;
+}
+
+static RC record_reader_update_adapter(Record *record, void *context) {
+  RecordUpdater &record_updater = *(RecordUpdater *)context;
+  return record_updater.add_record(record);
+}
+
 RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value, int condition_num,
     const Condition conditions[], int *updated_count)
 {
-  return RC::GENERIC_ERROR;
+  // return RC::GENERIC_ERROR;
+  // check  whether the conditions is valid
+  for (int i = 0; i < condition_num; i++) {
+    char *condition_attribute_name;
+    if (conditions[i].left_is_attr) {
+      condition_attribute_name = conditions[i].left_attr.attribute_name;
+    }
+    else {
+      condition_attribute_name = conditions[i].right_attr.attribute_name;
+    }
+    const FieldMeta *field_meta = table_meta_.field(condition_attribute_name);
+    if (nullptr == field_meta) {
+      LOG_WARN("No such field in conidtions. %s.%s", name(), condition_attribute_name);
+      return RC::SCHEMA_FIELD_MISSING;
+    }
+  }
+
+  RC rc = RC::SUCCESS;
+  CompositeConditionFilter filter;
+  filter.init(*this, conditions, condition_num);
+
+  RecordUpdater updater(*this, trx, attribute_name, *value);
+  rc = updater.init();
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+  // Scan qualified records and save them in vector<Record>
+  rc = scan_record(trx, &filter, -1, &updater, record_reader_update_adapter);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+  rc = updater.do_update();
+  if (updated_count != nullptr) {
+    *updated_count = updater.updated_count();
+  }
+  return rc;
 }
 
 class RecordDeleter {
@@ -685,7 +856,40 @@ RC Table::delete_record(Trx *trx, ConditionFilter *filter, int *deleted_count)
   }
   return rc;
 }
+// RC Table::update_record(Trx *trx, Record *record)
+// {
+//   RC rc = RC::SUCCESS;
+  
+//   rc = update_entry_of_indexes(record->data(), record->rid(), false);  // 重复代码 refer to commit_delete
+//   if (rc != RC::SUCCESS) {
+//     LOG_ERROR("Failed to delete indexes of record (rid=%d.%d). rc=%d:%s",
+//                 record->rid().page_num, record->rid().slot_num, rc, strrc(rc));
+//     return rc;
+//   } 
+  
+//   rc = record_handler_->delete_record(&record->rid());
+//   if (rc != RC::SUCCESS) {
+//     LOG_ERROR("Failed to delete record (rid=%d.%d). rc=%d:%s",
+//                 record->rid().page_num, record->rid().slot_num, rc, strrc(rc));
+//     return rc;
+//   }
 
+//   if (trx != nullptr) {
+//     rc = trx->delete_record(this, record);
+    
+//     CLogRecord *clog_record = nullptr;
+//     rc = clog_manager_->clog_gen_record(CLogType::REDO_DELETE, trx->get_current_id(), clog_record, name(), 0, record);
+//     if (rc != RC::SUCCESS) {
+//       LOG_ERROR("Failed to create a clog record. rc=%d:%s", rc, strrc(rc));
+//       return rc;
+//     }
+//     rc = clog_manager_->clog_append_record(clog_record);
+//     if (rc != RC::SUCCESS) {
+//       return rc;
+//     }
+//   }
+//   return rc;
+// }
 RC Table::delete_record(Trx *trx, Record *record)
 {
   RC rc = RC::SUCCESS;
@@ -718,7 +922,6 @@ RC Table::delete_record(Trx *trx, Record *record)
       return rc;
     }
   }
-
   return rc;
 }
 

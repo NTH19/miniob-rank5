@@ -22,7 +22,7 @@ See the Mulan PSL v2 for more details. */
 class SQLStageEvent;
 class SessionEvent;
 class SelectStmt;
-
+class UpdateStmt;
 class ExecuteStage : public common::Stage {
 public:
   ~ExecuteStage();
@@ -50,7 +50,7 @@ protected:
   RC do_begin(SQLStageEvent *sql_event);
   RC do_commit(SQLStageEvent *sql_event);
   RC do_clog_sync(SQLStageEvent *sql_event);
-
+  RC do_update(UpdateStmt * stmt, SessionEvent *session_event);
 protected:
 private:
   Stage *default_storage_stage_ = nullptr;

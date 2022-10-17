@@ -92,14 +92,29 @@ RC Trx::insert_record(Table *table, Record *record)
   insert_operation(table, Operation::Type::INSERT, record->rid());
   return rc;
 }
+RC Trx::update_record(Table *table, Record *record) {
+  RC rc = RC::SUCCESS;
+  // 先校验是否以前是否存在过(应该不会存在) 
+  Operation *old_oper = find_operation(table, record->rid());
+  if (old_oper != nullptr) {
+    return RC::GENERIC_ERROR; // error code
+  }
 
+  start_if_not_started();
+
+  // 设置record中trx_field为当前的事务号
+  // set_record_trx_id(table, record, trx_id_, false);
+  // 记录到operations中
+  update_operation(table, Operation::Type::UPDATE, record->rid());
+  return rc;
+}
 RC Trx::delete_record(Table *table, Record *record)
 {
   RC rc = RC::SUCCESS;
   start_if_not_started();
   Operation *old_oper = find_operation(table, record->rid());
   if (old_oper != nullptr) {
-    if (old_oper->type() == Operation::Type::INSERT) {
+    if (old_oper->type() == Operation::Type::INSERT || old_oper->type() == Operation::Type::UPDATE) {
       delete_operation(table, record->rid());
       return RC::SUCCESS;
     } else {
@@ -150,7 +165,10 @@ void Trx::insert_operation(Table *table, Operation::Type type, const RID &rid)
   OperationSet &table_operations = operations_[table];
   table_operations.emplace(type, rid);
 }
-
+void Trx::update_operation(Table *table, Operation::Type type, const RID &rid) {
+  OperationSet & table_operations = operations_[table];
+  table_operations.emplace(type, rid);
+}
 void Trx::delete_operation(Table *table, const RID &rid)
 {
 
@@ -184,6 +202,14 @@ RC Trx::commit()
                 "Failed to commit insert operation. rid=%d.%d, rc=%d:%s", rid.page_num, rid.slot_num, rc, strrc(rc));
           }
         } break;
+        case Operation::Type::UPDATE: {
+          rc = table->commit_update(this, rid);
+          if (rc != RC::SUCCESS) {
+            // handle rc
+            LOG_ERROR("Failed to commit update operation. rid=%d.%d, rc=%d:%s",
+                      rid.page_num, rid.slot_num, rc, strrc(rc));
+          }
+        }break;
         case Operation::Type::DELETE: {
           rc = table->commit_delete(this, rid);
           if (rc != RC::SUCCESS) {
@@ -225,6 +251,14 @@ RC Trx::rollback()
                 "Failed to rollback insert operation. rid=%d.%d, rc=%d:%s", rid.page_num, rid.slot_num, rc, strrc(rc));
           }
         } break;
+        case Operation::Type::UPDATE: {
+          rc = table->rollback_update(this, rid);
+          if (rc != RC::SUCCESS) {
+            // handle rc
+            LOG_ERROR("Failed to rollback insert operation. rid=%d.%d, rc=%d:%s",
+                      rid.page_num, rid.slot_num, rc, strrc(rc));
+          }
+        }break;
         case Operation::Type::DELETE: {
           rc = table->rollback_delete(this, rid);
           if (rc != RC::SUCCESS) {
@@ -250,7 +284,10 @@ RC Trx::commit_insert(Table *table, Record &record)
   set_record_trx_id(table, record, 0, false);
   return RC::SUCCESS;
 }
-
+RC Trx::commit_update(Table *table, Record &record) {
+  set_record_trx_id(table, record, 0, false);
+  return RC::SUCCESS;
+}
 RC Trx::rollback_delete(Table *table, Record &record)
 {
   set_record_trx_id(table, record, 0, false);
