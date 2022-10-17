@@ -31,7 +31,8 @@ public:
 
   RC insert_entry(const char *record, const RID *rid) override;
   RC delete_entry(const char *record, const RID *rid) override;
-
+  RC update_entry(const char *record, const RID *rid, const char *new_data);
+  BplusTreeHandler* get_index_handler_() { return &index_handler_; }
   /**
    * 扫描指定范围的数据
    */

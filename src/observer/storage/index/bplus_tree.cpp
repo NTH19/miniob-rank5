@@ -1702,6 +1702,16 @@ RC BplusTreeHandler::delete_entry(const char *user_key, const RID *rid)
   mem_pool_item_->free(key);
   return RC::SUCCESS;
 }
+RC BplusTreeHandler::update_entry(const char *data, const RID *rid, const char *new_data) {
+  // delete entry
+  RC rc = RC::SUCCESS;
+  rc = delete_entry(data, rid);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to update entry when delting old entry. ");
+    return rc;
+  }
+  return insert_entry(new_data, rid);
+}
 
 BplusTreeScanner::BplusTreeScanner(BplusTreeHandler &tree_handler) : tree_handler_(tree_handler)
 {}

@@ -416,6 +416,8 @@ public:
    */
   RC delete_entry(const char *user_key, const RID *rid);
 
+  RC update_entry(const char *data, const RID *rid, const char *new_data);
+
   bool is_empty() const;
 
   /**
