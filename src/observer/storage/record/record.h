@@ -97,7 +97,7 @@ public:
   RID & rid() { return rid_; }
   const RID &rid() const { return rid_; };
 
-private:
+public:
   RID                            rid_;
 
   // the data buffer

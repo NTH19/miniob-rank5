@@ -770,7 +770,27 @@ RC Table::update_record(Trx *trx, Record *record, const char *attribute_name, co
      LOG_ERROR("Failed to update indexes of record (rid=%d.%d). rc=%d:%s",record->rid().page_num, record->rid().slot_num, rc, strrc(rc));
     return rc;
   } else {
-    record->set_data((char *)new_data) ;
+    auto f=this->table_meta_.field(attribute_name);
+    auto addr=record->data()+f->offset();
+    switch (f->type()) {
+      case INTS: {
+        *(int*)addr = *(int*)new_data;
+      }
+      break;
+      case FLOATS: {
+        *(float*)addr= *(float*)new_data;
+      }
+        break;
+      case CHARS: {
+        // The length of the string before and after modification is different
+        auto record_data_size = strlen((char*)new_data);
+        if (record_data_size < 4) {
+          record_data_size += 1;
+        }
+        memcpy(addr,new_data,record_data_size);
+      }
+      break;
+    } 
     rc = record_handler_->update_record(record);
   }
   return rc;
