@@ -41,7 +41,7 @@ public:
   const char * data(){return new_data_;}
 FilterStmt *filter_stmt() const { return filter_stmt_; }
 StmtType type() const override { return StmtType::UPDATE; }
-public:
+private:
   Table *table_ = nullptr;
   const Value* values_ ;
   int value_amount_ = 0;
