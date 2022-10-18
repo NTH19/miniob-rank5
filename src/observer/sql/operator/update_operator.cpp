@@ -28,8 +28,10 @@ RC UpdateOperator::open()
 
     RowTuple *row_tuple = static_cast<RowTuple *>(tuple);
     Record &record = row_tuple->record();
-    UpdateStmt * update_stmt=UpdateOperator::get();
-    rc = table->update_record(nullptr, &record,update_stmt->attribute(),update_stmt->data());
+    UpdateStmt * update_stmt=UpdateOperator::update_stmt_;
+    int c=1;
+    int * con=&c;
+    rc = table->update_record(nullptr, update_stmt->attribute_name_,update_stmt->values_,(int) update_stmt->condition_num,update_stmt->conditions,con);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to update record: %s", strrc(rc));
       return rc;
