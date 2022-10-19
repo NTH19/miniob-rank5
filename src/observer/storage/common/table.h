@@ -103,6 +103,10 @@ private:
   IndexScanner *find_index_for_scan(const DefaultConditionFilter &filter);
   RC insert_record(Trx *trx, Record *record);
 
+  RC cast_to_char(const FieldMeta &field, const Value &src_value, char *record);
+  RC cast_to_int(const FieldMeta &field, const Value &src_value, char *record);
+  RC cast_to_float(const FieldMeta &field, const Value &src_value, char *record);
+
 public:
   RC recover_insert_record(Record *record);
 
