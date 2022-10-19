@@ -17,3 +17,5 @@ GRTAGS
 GPATH
 GTAGS
 #*#
+miniob
+observer.log.*
