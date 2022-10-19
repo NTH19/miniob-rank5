@@ -45,7 +45,8 @@ typedef enum
   UNDEFINED,
   CHARS,
   INTS,
-  FLOATS
+  FLOATS,
+  DATES
 } AttrType;
 
 //属性值
@@ -190,8 +191,9 @@ void relation_attr_destroy(RelAttr *relation_attr);
 void value_init_integer(Value *value, int v);
 void value_init_float(Value *value, float v);
 void value_init_string(Value *value, const char *v);
+ int value_init_date(Value *value, const char *v);
 void value_destroy(Value *value);
-
+ int  check_date(int y, int m, int d);
 void condition_init(Condition *condition, CompOp comp, int left_is_attr, RelAttr *left_attr, Value *left_value,
     int right_is_attr, RelAttr *right_attr, Value *right_value);
 void condition_destroy(Condition *condition);

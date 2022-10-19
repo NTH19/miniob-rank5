@@ -626,13 +626,11 @@ if (update_stmt == nullptr) {
         session_event->set_response("FAILURE\n");
         return rc;
       }
-
       rc = clog_manager->clog_append_record(clog_record);
       if (rc != RC::SUCCESS) {
         session_event->set_response("FAILURE\n");
         return rc;
       } 
-
       trx->next_current_id();
       session_event->set_response("SUCCESS\n");
     }
