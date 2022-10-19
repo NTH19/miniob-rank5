@@ -250,6 +250,15 @@ RC Table::rollback_insert(Trx *trx, const RID &rid)
   rc = record_handler_->delete_record(&rid);
   return rc;
 }
+RC Insert_Date_Checker(Value values){
+  int dates=0;
+  if(values.type==DATES){
+    dates = *(int*)values.data;
+    if(dates==-1)return RC::INVALID_ARGUMENT;
+  }
+  return RC::SUCCESS;
+}
+
 RC Table::rollback_update(Trx *trx, const RID &rid) {
 
   Record record;
@@ -352,9 +361,16 @@ RC Table::insert_record(Trx *trx, int value_num, const Value *values)
     LOG_ERROR("Invalid argument. table name: %s, value num=%d, values=%p", name(), value_num, values);
     return RC::INVALID_ARGUMENT;
   }
-
+  RC rc = RC::SUCCESS;
+  for(int i=0;i<value_num;++i){
+    rc = Insert_Date_Checker(values[i]);
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Invalid argument. value num=%d, values=%p", value_num, values);
+      return RC::INVALID_ARGUMENT;
+    }
+  }
   char *record_data;
-  RC rc = make_record(value_num, values, record_data);
+  rc = make_record(value_num, values, record_data);
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to create a record. rc=%d:%s", rc, strrc(rc));
     return rc;
@@ -709,37 +725,29 @@ public:
       }
       return RC::MISMATCH;
     }
+    attr_data_size_ = field_meta_->len();
     return RC::SUCCESS;
   }
   RC add_record(Record* record) {
     records_.push_back(*record);
+    return RC::SUCCESS;
   }
   RC do_update() {
     RC rc = RC::SUCCESS;
     int record_size = table_.table_meta().record_size();
     char *new_record_data = new char[record_size];
     int record_data_size = 0;
-    switch (field_meta_->type()) {
-      case INTS: {
-        record_data_size = sizeof(int);
-      }
-      break;
-      case FLOATS: {
-        record_data_size = sizeof(float);
-      }
-        break;
-      case CHARS: {
-        // The length of the string before and after modification is different
-        record_data_size = strlen((char*)value_.data);
-        if (record_data_size < 4) {
-          record_data_size += 1;
-        }
-      }
-      break;
-    } 
+    
     int i = 0;
     for (Record &record : records_) {
       // create new record->data
+      int record_data_size = attr_data_size_;
+      if (field_meta_->type() == CHARS) {
+        record_data_size = strlen((char *)value_.data) + 1;
+        if (record_data_size > attr_data_size_) {
+          record_data_size = attr_data_size_;
+        }
+      }
       memcpy(new_record_data, record.data(), record_size);
       memcpy(new_record_data + field_meta_->offset(), value_.data, record_data_size);
       rc = table_.update_record(trx_, &record, attribute_name_, new_record_data);
@@ -760,6 +768,7 @@ private:
   Value value_;
   const FieldMeta *field_meta_;
   int updated_count_ = 0;
+  int attr_data_size_ = 0;
   std::vector<Record> records_;
 };
 
@@ -800,21 +809,20 @@ RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value
 {
   // return RC::GENERIC_ERROR;
   // check  whether the conditions is valid
-  for (int i = 0; i < condition_num; i++) {
-    char *condition_attribute_name;
-    if (conditions[i].left_is_attr) {
-      condition_attribute_name = conditions[i].left_attr.attribute_name;
-    }
-    else {
-      condition_attribute_name = conditions[i].right_attr.attribute_name;
-    }
-    const FieldMeta *field_meta = table_meta_.field(condition_attribute_name);
-    if (nullptr == field_meta) {
-      LOG_WARN("No such field in conidtions. %s.%s", name(), condition_attribute_name);
-      return RC::SCHEMA_FIELD_MISSING;
-    }
-  }
-
+  // for (int i = 0; i < condition_num; i++) {
+  //   char *condition_attribute_name;
+  //   if (conditions[i].left_is_attr) {
+  //     condition_attribute_name = conditions[i].left_attr.attribute_name;
+  //   }
+  //   else {
+  //     condition_attribute_name = conditions[i].right_attr.attribute_name;
+  //   }
+  //   const FieldMeta *field_meta = table_meta_.field(condition_attribute_name);
+  //   if (nullptr == field_meta) {
+  //     LOG_WARN("No such field in conidtions. %s.%s", name(), condition_attribute_name);
+  //     return RC::SCHEMA_FIELD_MISSING;
+  //   }
+  // }
   RC rc = RC::SUCCESS;
   CompositeConditionFilter filter;
   filter.init(*this, conditions, condition_num);
