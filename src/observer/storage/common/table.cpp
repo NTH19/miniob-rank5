@@ -13,8 +13,10 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include <limits.h>
+#include <math.h>
 #include <string.h>
 #include <algorithm>
+#include <string>
 
 #include "common/defs.h"
 #include "storage/common/table.h"
@@ -29,6 +31,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/index/bplus_tree_index.h"
 #include "storage/trx/trx.h"
 #include "storage/clog/clog.h"
+#include "util/util.h"
 
 Table::~Table()
 {
@@ -393,6 +396,95 @@ const TableMeta &Table::table_meta() const
   return table_meta_;
 }
 
+RC Table::cast_to_char(const FieldMeta &field, const Value &src_value, char *record) 
+{
+  switch (src_value.type)
+  {
+  case CHARS: {
+    size_t copy_len = std::min(static_cast<size_t>(field.len()), 
+                              strlen(static_cast<const char *>(src_value.data)) + 1);
+    memcpy(record + field.offset(), src_value.data, copy_len);
+    break;
+  }
+  case INTS: {
+    std::string num = std::to_string(*static_cast<int *>(src_value.data));
+    size_t copy_len = std::min(static_cast<size_t>(field.len()), num.size() + 1);
+    memcpy(record + field.offset(), num.c_str(), copy_len);
+    break;
+  }
+  case FLOATS: {
+    std::string num = double2string(*static_cast<float *>(src_value.data));
+    size_t copy_len = std::min(static_cast<size_t>(field.len()), num.size() + 1);
+    memcpy(record + field.offset(), num.c_str(), copy_len);
+    LOG_INFO("cast float value=%f to %s", *static_cast<float *>(src_value.data), num.c_str());
+    break;
+  }
+  case DATES:
+  default:
+    LOG_WARN("cannot cast type=%d to char", src_value.type);
+    return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+  }
+  return RC::SUCCESS;
+}
+
+RC Table::cast_to_int(const FieldMeta &field, const Value &src_value, char *record) 
+{
+  switch (src_value.type)
+  {
+  case CHARS: {
+    int num = atoi(static_cast<const char *>(src_value.data));
+    memcpy(record + field.offset(), &num, field.len());
+    break;
+  }
+  case INTS: {
+    memcpy(record + field.offset(), src_value.data, field.len());
+    break;
+  }
+  case FLOATS: {
+    float val = *static_cast<float *>(src_value.data);
+    int num = static_cast<int>(round(val));
+    memcpy(record + field.offset(), &num, field.len());
+    break;
+  }
+  case DATES:
+  default:
+    LOG_WARN("cannot cast type=%d to int", src_value.type);
+    return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+  }
+  return RC::SUCCESS;
+}
+
+RC Table::cast_to_float(const FieldMeta &field, const Value &src_value, char *record) 
+{
+  switch (src_value.type)
+  {
+  case CHARS: {
+    float num = atof(static_cast<const char *>(src_value.data));
+    memcpy(record + field.offset(), &num, field.len());
+    break;
+  }
+  case INTS: {
+    float num = static_cast<float>(*static_cast<int *>(src_value.data));
+    memcpy(record + field.offset(), &num, field.len());
+    break;
+  }
+  case FLOATS: {
+    memcpy(record + field.offset(), src_value.data, field.len());
+    break;
+  }
+  case DATES:
+  default:
+    LOG_WARN("cannot cast type=%d to float", src_value.type);
+    return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+  }
+  return RC::SUCCESS;
+}
+
+//   CHARS,
+//   INTS,
+//   FLOATS,
+//   DATES
+
 RC Table::make_record(int value_num, const Value *values, char *&record_out)
 {
   // 检查字段类型是否一致
@@ -405,7 +497,7 @@ RC Table::make_record(int value_num, const Value *values, char *&record_out)
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value &value = values[i];
-    if (field->type() != value.type) {
+    if (field->type() != value.type && (value.type == DATES || value.type == UNDEFINED)) {
       LOG_ERROR("Invalid value type. table name =%s, field name=%s, type=%d, but given=%d",
           table_meta_.name(),
           field->name(),
@@ -418,18 +510,33 @@ RC Table::make_record(int value_num, const Value *values, char *&record_out)
   // 复制所有字段的值
   int record_size = table_meta_.record_size();
   char *record = new char[record_size];
+  RC rc = RC::SUCCESS;
 
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value &value = values[i];
-    size_t copy_len = field->len();
-    if (field->type() == CHARS) {
-      const size_t data_len = strlen((const char *)value.data);
-      if (copy_len > data_len) {
-        copy_len = data_len + 1;
-      }
+    switch (field->type())
+    {
+    case CHARS:
+      rc = cast_to_char(*field, value, record);
+      break;
+    case INTS:
+      rc = cast_to_int(*field, value, record);
+      break;
+    case FLOATS:
+      rc = cast_to_float(*field, value, record);
+      break;
+    case DATES:
+      memcpy(record + field->offset(), value.data, field->len());
+    default:
+      rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
+      break;
     }
-    memcpy(record + field->offset(), value.data, copy_len);
+  }
+
+  if (rc != RC::SUCCESS) {
+    delete[] record;
+    return rc;
   }
 
   record_out = record;
