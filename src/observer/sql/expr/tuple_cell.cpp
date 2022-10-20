@@ -37,7 +37,8 @@ void TupleCell::to_string(std::ostream &os) const
     }
   } break;
   case DATES:{
-  os << *(int *)data_;
+    std::string s=std::to_string(*(int*)data_);
+    os<<s.substr(0,4)<<"-"<<s.substr(4,2)<<"-"<<s.substr(6,2);
   }break;
   default: {
     LOG_WARN("unsupported attr type: %d", attr_type_);
