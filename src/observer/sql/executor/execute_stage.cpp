@@ -595,7 +595,9 @@ RC ExecuteStage::do_insert(SQLStageEvent *sql_event)
 
   InsertStmt *insert_stmt = (InsertStmt *)stmt;
   Table *table = insert_stmt->table();
-  const Value * v=insert_stmt->values();
+  int j=insert_stmt->record_num();
+  for(int k=0;k<j;k++){
+  const Value * v=insert_stmt->values_[k];
   for(int i=0;i<insert_stmt->value_amount();i++){
     const Value * vm=v+i;
     if(vm->data==nullptr){
@@ -603,8 +605,20 @@ RC ExecuteStage::do_insert(SQLStageEvent *sql_event)
       return RC::INVALID_ARGUMENT;
     }
   }
+ }
+  const Inserts &inserts = sql_event->query()->sstr.insertion;//get inserts
+  int cnt = table->table_meta().field_num() - table->table_meta().sys_field_num();//check length
+  for(int i = 0,j = 0;i < inserts.record_num;i++,j=inserts.record_length[i-1]){
+    if(inserts.record_length[i] - j != cnt){
+      LOG_ERROR("record %d has wrong length %d - %d should be %d",i ,inserts.record_length[i], j, cnt);
+      end_trx_if_need(session, trx, false);
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
+  }
 
-  RC rc = table->insert_record(trx, insert_stmt->value_amount(), insert_stmt->values());
+  RC rc = table->insert_records(trx,(int)inserts.record_num,(int)inserts.value_num,inserts.values);
+
+  //rc = table->insert_record(trx, insert_stmt->value_amount(), insert_stmt->values());
   if (rc == RC::SUCCESS) {
     if (!session->is_trx_multi_operation_mode()) {
       CLogRecord *clog_record = nullptr;
@@ -626,6 +640,7 @@ RC ExecuteStage::do_insert(SQLStageEvent *sql_event)
       session_event->set_response("SUCCESS\n");
     }
   } else {
+    
     session_event->set_response("FAILURE\n");
   }
   return rc;
