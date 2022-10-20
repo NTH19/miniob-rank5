@@ -262,6 +262,17 @@ RC Insert_Date_Checker(Value values){
   return RC::SUCCESS;
 }
 
+RC Table::show_index(std::vector<std::string>& ret){
+  ret.push_back("Table | Non_unique |Key_name | Seq_in_index |Column_name");
+  std::string head(this->name());
+  for(int i=0;i<indexes_.size();++i){
+    auto v=indexes_[i]->index_meta();
+    std::string s;
+    s=head+"|1|"+std::string(v.name())+"|"+std::to_string(i)+"|"+std::string(v.field());
+    ret.emplace_back(s);
+  }
+  return RC::SUCCESS;
+ }
 RC Table::rollback_update(Trx *trx, const RID &rid) {
 
   Record record;

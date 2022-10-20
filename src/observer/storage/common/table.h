@@ -63,6 +63,7 @@ public:
   RC delete_record(Trx *trx, ConditionFilter *filter, int *deleted_count);
   RC delete_record(Trx *trx, Record *record);
   RC recover_delete_record(Record *record);
+  RC show_index(std::vector<std::string>& ret);
 
   RC drop(const char *path, const char *name, const char *base_dir);
 

@@ -167,6 +167,9 @@ void ExecuteStage::handle_request(common::StageEvent *event)
     case SCF_SHOW_TABLES: {
       do_show_tables(sql_event);
     } break;
+    case SCF_SHOW_INDEXES: {
+        do_show_indexes(sql_event);
+      } break;
     case SCF_DESC_TABLE: {
       do_desc_table(sql_event);
     } break;
@@ -539,6 +542,25 @@ RC ExecuteStage::do_show_tables(SQLStageEvent *sql_event)
     session_event->set_response(ss.str().c_str());
   }
   return RC::SUCCESS;
+}
+RC ExecuteStage::do_show_indexes(SQLStageEvent *sql_event)
+{
+  SessionEvent *session_event = sql_event->session_event();
+  Db *db = session_event->session()->get_current_db();
+  const ShowIndex &sIndex = sql_event->query()->sstr.show_index;
+  Table *table = db->find_table(sIndex.relation_name);
+  if (nullptr == table) {
+    session_event->set_response("FAILURE\n");
+    return RC::SCHEMA_TABLE_NOT_EXIST;
+  }
+  std::vector<std::string> ret;
+  RC rc = table->show_index(ret);
+  std::stringstream ss;
+  for (auto &x : ret) {
+    ss << x << std::endl;
+  }
+  session_event->set_response(ss.str().c_str());
+  return rc;
 }
 
 RC ExecuteStage::do_desc_table(SQLStageEvent *sql_event)
