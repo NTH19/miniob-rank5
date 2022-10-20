@@ -37,6 +37,7 @@ public:
   AttrType type() const;
   int offset() const;
   int len() const;
+  void set_name(std::string);
   bool visible() const;
 
 public:

@@ -38,6 +38,9 @@ public:
   void to_string(std::ostream &os) const;
 
   int compare(const TupleCell &other) const;
+
+  void do_aggfun(int &ret,DescribeFun,int&char_len) const;
+
   bool like(const TupleCell &other) const;
 
   const char *data() const
