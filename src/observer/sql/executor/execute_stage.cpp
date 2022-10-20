@@ -253,6 +253,22 @@ void print_tuple_header(std::ostream &os, const ProjectOperator &oper)
     os << '\n';
   }
 }
+void print_aggfun_header(std::ostream &os, const std::vector<std::pair<DescribeFun,Field>>& funs)
+{
+  
+  for (int i = 0; i < funs.size(); i++) {
+    if (i != 0) os << " | ";
+    switch(funs[i].first){
+      case MAX: os<<" MAX("<<funs[i].second.field_name()<<") ";break;
+      case MIN: os<<" MIN("<<funs[i].second.field_name()<<") ";break;
+      case AVG: os<<" AVG("<<funs[i].second.field_name()<<") ";break;
+      case SUM: os<<" SUM("<<funs[i].second.field_name()<<") ";break;
+      case COUNT: os<<" COUNT("<<funs[i].second.field_name()<<") ";break;
+      case COUNT_STAR: os<<" COUNT(*)";break;
+    }
+  }
+    os << '\n';
+}
 void tuple_to_string(std::ostream &os, const Tuple &tuple)
 {
   TupleCell cell;
@@ -399,7 +415,73 @@ IndexScanOperator *try_to_create_index_scan_operator(FilterStmt *filter_stmt)
   LOG_INFO("use index for scan: %s in table %s", index->index_meta().name(), table->name());
   return oper;
 }
-
+void do_aggfun(std::vector<int>&ret, std::vector<int>&char_len,const Tuple &tuple,const std::vector<std::pair<DescribeFun,Field>>& funs){
+  TupleCell cell;
+  RC rc = RC::SUCCESS;
+  for (int i = 0; i < tuple.cell_num(); i++) {
+    rc = tuple.cell_at(i, cell);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to fetch field of cell. index=%d, rc=%s", i, strrc(rc));
+      break;
+    }
+    cell.do_aggfun(ret[i],funs[i].first,char_len[i]);
+  }
+}
+void gen_result(std::vector<int>&ret,const std::vector<std::pair<DescribeFun,Field>>& funs,std::ostream &os,int cnt ,std::vector<int>& char_len){
+  bool is_first=true;
+  for(int i=0;i<ret.size();++i){
+    if(is_first){
+      is_first=false;
+    } else os<<" | ";
+    if(funs[i].first==AVG){
+      os<<(float)ret[i]/cnt;
+      continue;
+    }
+    if(funs[i].first==COUNT ||funs[i].first==COUNT_STAR){
+      os<<cnt;
+      continue;
+    }
+    switch (funs[i].second.attr_type())
+    {
+    case FLOATS:
+      os<<*(float*)&ret[i];
+      break;
+    case INTS:
+      os<<ret[i];
+      break;
+    case CHARS:
+      os<<std::string((char*)&ret[i],char_len[i]);
+      break;
+    }
+  }
+  os<<"\n";
+}
+void init_ret_aggfun(std::vector<int>&ret,const std::vector<std::pair<DescribeFun,Field>>& funs,std::vector<int>&char_len){
+  int n=ret.size();
+  for(int i=0;i<n;++i){
+    if(funs[i].first== MIN){
+      if(funs[i].second.attr_type()==CHARS){
+        memset(&ret[i],127,4);
+        char_len[i]=3;
+      }else if(funs[i].second.attr_type()==FLOATS){
+        *(float*)&ret[i]=99999999;
+      }else if(funs[i].second.attr_type()==INTS){
+        ret[i]=INT32_MAX;
+      }
+    }else if(funs[i].first== MAX){
+      if(funs[i].second.attr_type()==CHARS){
+        memset(&ret[i],0,4);
+        char_len[i]=3;
+      }else if(funs[i].second.attr_type()==FLOATS){
+        *(float*)&ret[i]=0;
+      }else if(funs[i].second.attr_type()==INTS){
+        ret[i]=-100000;
+      } 
+    }else if(funs[i].first== SUM ||funs[i].first== AVG ){
+      ret[i]=0;
+    }
+  }
+}
 RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 {
   SelectStmt *select_stmt = (SelectStmt *)(sql_event->stmt());
@@ -409,6 +491,53 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     LOG_WARN("select more than 1 tables is not supported");
     rc = RC::UNIMPLENMENT;
     return rc;
+  }
+  //agg  fun happens here
+  if(select_stmt->funs().size()!=0){
+    auto funs=select_stmt->funs();
+    Operator *scan_oper =new TableScanOperator(select_stmt->tables()[0]);
+    DEFER([&] () {delete scan_oper;});
+    PredicateOperator pred_oper(select_stmt->filter_stmt());
+    pred_oper.add_child(scan_oper);
+    ProjectOperator project_oper;
+    project_oper.add_child(&pred_oper);
+    for (int i=0;i<funs.size();++i) {
+      project_oper.add_projection(funs[i].second.table(), funs[i].second.meta());
+    }
+    rc = project_oper.open();
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to open operator");
+      return rc;
+    }
+    std::stringstream ss;
+    print_aggfun_header(ss, funs);
+    std::vector<int>ret(funs.size(),0);
+    std::vector<int>char_len(funs.size(),0);
+    init_ret_aggfun(ret,funs,char_len);
+    int cnt=0;
+    while ((rc = project_oper.next()) == RC::SUCCESS) {
+    // get current record
+    // write to response
+    Tuple * tuple = project_oper.current_tuple();
+    if (nullptr == tuple) {
+      rc = RC::INTERNAL;
+      LOG_WARN("failed to get current record. rc=%s", strrc(rc));
+      break;
+    }
+    do_aggfun(ret,char_len, *tuple,funs);
+    cnt++;
+  }
+
+  if (rc != RC::RECORD_EOF) {
+    LOG_WARN("something wrong while iterate operator. rc=%s", strrc(rc));
+    project_oper.close();
+  } else {
+    rc = project_oper.close();
+  }
+  gen_result(ret, funs,ss,cnt,char_len);
+
+  session_event->set_response(ss.str());
+  return rc;
   }
 
   //check whether is valid (maybe just for date)

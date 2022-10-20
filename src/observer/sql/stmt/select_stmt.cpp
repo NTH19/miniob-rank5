@@ -62,7 +62,39 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
     tables.push_back(table);
     table_map.insert(std::pair<std::string, Table*>(table_name, table));
   }
-  
+  if(select_sql.aggfun_num &&select_sql.attr_num){
+    return RC::GENERIC_ERROR;
+  } 
+
+  std::vector<std::pair<DescribeFun,Field>> funs;
+  std::vector<Field> fun_fields(select_sql.aggfun_num);
+  for (int i = select_sql.aggfun_num - 1; i >= 0; i--) {
+    const RelAttr &relation_attr = select_sql.aggFun[i].attr;
+    if ( 0==strcmp(relation_attr.attribute_name, "*")) {
+      const FieldMeta *field_meta= tables[0]->table_meta().field(2);
+      if (nullptr == field_meta) {
+        return RC::SCHEMA_FIELD_MISSING;
+      }
+      fun_fields[i]=Field(tables[0], field_meta);
+    } else {
+      if (tables.size() != 1) {
+        LOG_WARN("invalid. I do not know the attr's table. attr=%s", relation_attr.attribute_name);
+        return RC::SCHEMA_FIELD_MISSING;
+      }
+
+      Table *table = tables[0];
+      const FieldMeta *field_meta = table->table_meta().field(relation_attr.attribute_name);
+      if (nullptr == field_meta) {
+        LOG_WARN("no such field. field=%s.%s.%s", db->name(), table->name(), relation_attr.attribute_name);
+        return RC::SCHEMA_FIELD_MISSING;
+      }
+
+      fun_fields[i]=Field(table, field_meta);
+    }
+    funs.push_back(std::pair<DescribeFun,Field>(select_sql.aggFun[i].des,fun_fields[i]));
+  }
+
+
   // collect query fields in `select` statement
   std::vector<Field> query_fields;
   for (int i = select_sql.attr_num - 1; i >= 0; i--) {
@@ -141,6 +173,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();
   select_stmt->tables_.swap(tables);
+  select_stmt->funs_.swap(funs);
   select_stmt->query_fields_.swap(query_fields);
   select_stmt->filter_stmt_ = filter_stmt;
   stmt = select_stmt;

@@ -50,7 +50,15 @@ typedef enum
   FLOATS,
   DATES
 } AttrType;
-
+typedef enum
+{
+  SUM,
+  COUNT,
+  COUNT_STAR,
+  MAX,
+  MIN,
+  AVG
+} DescribeFun;
 //属性值
 typedef struct _Value {
   AttrType type;  // type of value
@@ -68,15 +76,21 @@ typedef struct _Condition {
   RelAttr right_attr;  // right-hand side attribute if right_is_attr = TRUE 右边的属性
   Value right_value;   // right-hand side value if right_is_attr = FALSE
 } Condition;
+typedef struct {
+  DescribeFun des;
+  RelAttr attr;
+} AggFun;
 
 // struct of select
 typedef struct {
   size_t attr_num;                // Length of attrs in Select clause
   RelAttr attributes[MAX_NUM];    // attrs in Select clause
   size_t relation_num;            // Length of relations in Fro clause
+  size_t aggfun_num;
   char *relations[MAX_NUM];       // relations in From clause
   size_t condition_num;           // Length of conditions in Where clause
   Condition conditions[MAX_NUM];  // conditions in Where clause
+  AggFun aggFun[MAX_NUM];
 } Selects;
 
 // struct of insert
@@ -182,7 +196,8 @@ enum SqlCommandFlag {
   SCF_LOAD_DATA,
   SCF_HELP,
   SCF_EXIT,
-  SCF_SHOW_INDEXES
+  SCF_SHOW_INDEXES,
+  SCF_SELECT_WITH_FUN
 };
 // struct of flag and sql_struct
 typedef struct Query {
