@@ -45,7 +45,53 @@ void TupleCell::to_string(std::ostream &os) const
   } break;
   }
 }
-
+void memcp_for_max(void* dst,void* cmp,int accro){
+  if(accro>0)memcpy(dst,cmp,4);
+}
+void memcp_for_min(void* dst,void* cmp,int accro){
+  if(accro<0)memcpy(dst,cmp,4);
+}
+void TupleCell::do_aggfun(int &ret,DescribeFun des,int& char_len)const {
+  int res=0;
+  if(des==COUNT)return;
+  switch (this->attr_type_) {
+  case INTS: res= compare_int(this->data_, (void*)&ret);break;
+  case FLOATS: res= compare_float(this->data_, (void*)&ret);break;
+  case DATES: res= compare_int(this->data_, (void*)&ret);break;
+  case CHARS: res=compare_string(this->data_, this->length_, (void*)&ret,char_len);
+  break;
+  }
+  //to do :reduce the code
+  if(this->attr_type_==CHARS){
+    switch (des)
+    {
+    case MAX:
+      ret=res>0?*(int*)this->data_:ret;
+      char_len=ret==*(int*)this->data_?this->length_:char_len;
+      break;
+    case MIN:
+      ret=res<0?*(int*)this->data_:ret;
+      char_len=ret==*(int*)this->data_?this->length_:char_len;
+      break;
+    }
+    return;
+  }
+  switch (des)
+  {
+  case MAX:
+    memcp_for_max(&ret,this->data_,res);
+    break;
+  case MIN:
+    memcp_for_min(&ret,this->data_,res);
+    break;
+  case AVG:
+    *(float*)&ret+=*(float*)this->data_;
+    break;
+  case SUM:
+    ret+=*(int*)this->data_;
+    break;
+  }
+}
 int TupleCell::compare(const TupleCell &other) const
 {
   if (this->attr_type_ == other.attr_type_) {

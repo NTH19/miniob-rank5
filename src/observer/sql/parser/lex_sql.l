@@ -69,6 +69,11 @@ QUOTE            [\'\"]
 [Cc][Hh][Aa][Rr]                                     RETURN_TOKEN(STRING_T);
 [Ff][Ll][Oo][Aa][Tt]                                 RETURN_TOKEN(FLOAT_T);
 [Dd][Aa][Tt][Ee]			            	                 RETURN_TOKEN(DATE_T);
+[Cc][Oo][Uu][Nn][Tt]                                 RETURN_TOKEN(COUNT_T);
+[Aa][Vv][Gg]                                         RETURN_TOKEN(AVG_T);
+[Ss][Uu][Mm]                                         RETURN_TOKEN(SUM_T);
+[Mm][Aa][Xx]                                         RETURN_TOKEN(MAX_T);
+[Mm][Ii][Nn]                                         RETURN_TOKEN(MIN_T);
 [Ll][Oo][Aa][Dd]                                     RETURN_TOKEN(LOAD);
 [Dd][Aa][Tt][Aa]                                     RETURN_TOKEN(DATA);
 [Ii][Nn][Ff][Ii][Ll][Ee]                             RETURN_TOKEN(INFILE);
