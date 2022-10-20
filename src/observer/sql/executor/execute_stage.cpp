@@ -411,6 +411,28 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     return rc;
   }
 
+  //check whether is valid (maybe just for date)
+  for (const FilterUnit *filter_unit : select_stmt->filter_stmt()->filter_units()) {
+    TupleCell cell;
+    RowTuple t;
+    if(dynamic_cast<ValueExpr*>(filter_unit->left())){
+      filter_unit->left()->get_value(t,cell);
+      auto p=cell.data();
+      if(p==nullptr){
+          session_event->set_response("FAILURE\n");
+          return RC::INVALID_ARGUMENT;
+      }
+    }
+    if(dynamic_cast<ValueExpr*>(filter_unit->right())){
+      filter_unit->right()->get_value(t,cell);
+      auto p=cell.data();
+      if(p==nullptr){
+          session_event->set_response("FAILURE\n");
+          return RC::INVALID_ARGUMENT;
+      }
+    }
+  }
+
   Operator *scan_oper = try_to_create_index_scan_operator(select_stmt->filter_stmt());
   if (nullptr == scan_oper) {
     scan_oper = new TableScanOperator(select_stmt->tables()[0]);
@@ -595,6 +617,34 @@ RC ExecuteStage::do_insert(SQLStageEvent *sql_event)
 
   InsertStmt *insert_stmt = (InsertStmt *)stmt;
   Table *table = insert_stmt->table();
+  // for (const FilterUnit *filter_unit : insert_stmt->filter_stmt()->filter_units()) {
+  //   TupleCell cell;
+  //   RowTuple t;
+  //   if(dynamic_cast<ValueExpr*>(filter_unit->left())){
+  //     filter_unit->left()->get_value(t,cell);
+  //     auto p=cell.data();
+  //     if(p==nullptr){
+  //         session_event->set_response("FAILURE\n");
+  //         return RC::INVALID_ARGUMENT;
+  //     }
+  //   }
+  //   if(dynamic_cast<ValueExpr*>(filter_unit->right())){
+  //     filter_unit->right()->get_value(t,cell);
+  //     auto p=cell.data();
+  //     if(p==nullptr){
+  //         session_event->set_response("FAILURE\n");
+  //         return RC::INVALID_ARGUMENT;
+  //     }
+  //   }
+  // }
+  const Value * v=insert_stmt->values();
+  for(int i=0;i<insert_stmt->value_amount();i++){
+    const Value * vm=v+i;
+    if(vm->data==nullptr){
+      session_event->set_response("FAILURE\n");
+      return RC::INVALID_ARGUMENT;
+    }
+  }
 
   RC rc = table->insert_record(trx, insert_stmt->value_amount(), insert_stmt->values());
   if (rc == RC::SUCCESS) {
