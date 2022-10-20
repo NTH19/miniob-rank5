@@ -395,6 +395,43 @@ RC Table::insert_record(Trx *trx, int value_num, const Value *values)
   return rc;
 }
 
+RC Table::insert_records(Trx *trx, int record_num,int value_num, const Value values[MAX_DATA][MAX_NUM]){
+  if (value_num <= 0 || nullptr == values ) {
+    LOG_ERROR("Invalid argument. value num=%d, values=%p", value_num, values);
+    return RC::INVALID_ARGUMENT;
+  }
+  RC rc;
+  value_num=value_num/record_num;
+  const int normal_field_start_index = table_meta_.sys_field_num();
+  for(size_t jk=0;jk<record_num;jk++){//check filed
+    const Value * valuesc=values[jk];
+  for (int i = 0; i < value_num; i++) {
+    const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
+    const Value &value = valuesc[i];
+    if (field->type() != value.type || value.type == UNDEFINED) {
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
+  }
+}
+  for(int i = 0;i < record_num;i++){
+    char *record_data;
+    rc = make_record(value_num, values[i], record_data);
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to create a record. rc=%d:%s", rc, strrc(rc));
+      return rc;
+    }
+    Record record;
+    record.set_data(record_data);
+    rc = insert_record(trx, &record);
+    delete[] record_data;
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to insert a record. rc=%d:%s", rc, strrc(rc));
+      return rc;
+    }
+  }
+  return RC::SUCCESS;
+}
+
 const char *Table::name() const
 {
   return table_meta_.name();
@@ -506,12 +543,8 @@ RC Table::make_record(int value_num, const Value *values, char *&record_out)
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value &value = values[i];
-    if (field->type() != value.type &&  value.type == UNDEFINED) {
-      LOG_ERROR("Invalid value type. table name =%s, field name=%s, type=%d, but given=%d",
-          table_meta_.name(),
-          field->name(),
-          field->type(),
-          value.type);
+    if (field->type() != value.type || value.type == UNDEFINED) {
+
       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }
   }

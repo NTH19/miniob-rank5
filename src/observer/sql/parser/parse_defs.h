@@ -97,7 +97,9 @@ typedef struct {
 typedef struct {
   char *relation_name;    // Relation to insert into
   size_t value_num;       // Length of values
-  Value values[MAX_NUM];  // values to insert
+  Value values[MAX_DATA][MAX_NUM];  // values to insert
+  size_t record_num;
+  size_t record_length[MAX_DATA];
 } Inserts;
 
 // struct of delete
@@ -231,7 +233,7 @@ void selects_append_relation(Selects *selects, const char *relation_name);
 void selects_append_conditions(Selects *selects, Condition conditions[], size_t condition_num);
 void selects_destroy(Selects *selects);
 
-void inserts_init(Inserts *inserts, const char *relation_name, Value values[], size_t value_num);
+void inserts_init(Inserts *inserts, const char *relation_name, Value values[], size_t value_num,size_t single_record_length[], size_t record_num);
 void inserts_destroy(Inserts *inserts);
 
 void deletes_init_relation(Deletes *deletes, const char *relation_name);
