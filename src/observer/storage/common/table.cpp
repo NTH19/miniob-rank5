@@ -408,8 +408,14 @@ RC Table::insert_records(Trx *trx, int record_num,int value_num, const Value val
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value &value = valuesc[i];
-    if (field->type() != value.type || value.type == UNDEFINED) {
-      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    if (record_num == 1) {
+      if (field->type() != value.type && value.type == UNDEFINED) {
+        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+      }
+    } else {
+      if (field->type() != value.type || value.type == UNDEFINED) {
+        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+      }
     }
   }
 }
@@ -540,14 +546,6 @@ RC Table::make_record(int value_num, const Value *values, char *&record_out)
   }
 
   const int normal_field_start_index = table_meta_.sys_field_num();
-  for (int i = 0; i < value_num; i++) {
-    const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
-    const Value &value = values[i];
-    if (field->type() != value.type || value.type == UNDEFINED) {
-
-      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
-    }
-  }
 
   // 复制所有字段的值
   int record_size = table_meta_.record_size();
