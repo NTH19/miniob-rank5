@@ -261,12 +261,12 @@ RC Insert_Date_Checker(Value values){
 }
 
 RC Table::show_index(std::vector<std::string>& ret){
-  ret.push_back("Table | Non_unique |Key_name | Seq_in_index |Column_name");
+  ret.push_back("TABLE | NON_UNIQUE | KEY_NAME | SEQ_IN_INDEX | COLUMN_NAME");
   std::string head(this->name());
   for(int i=0;i<indexes_.size();++i){
     auto v=indexes_[i]->index_meta();
     std::string s;
-    s=head+"|1|"+std::string(v.name())+"|"+std::to_string(i)+"|"+std::string(v.field());
+    s=head+" | 1 | "+std::string(v.name())+" | 1 | "+std::string(v.field());
     ret.emplace_back(s);
   }
   return RC::SUCCESS;
