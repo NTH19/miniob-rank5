@@ -259,7 +259,17 @@ RC insert_record_from_file(
         value_init_string(&record_values[i], file_value.c_str());
       } break;
       case DATES: {
-        value_init_date(&record_values[i],file_value.c_str());
+        deserialize_stream.clear();  // 清理stream的状态，防止多次解析出现异常
+        deserialize_stream.str(file_value);
+
+        int int_value;
+        deserialize_stream >> int_value;
+        if (!deserialize_stream || !deserialize_stream.eof()) {
+          errmsg << "need an integer but got '" << file_values[i] << "' (field index:" << i << ")";
+          rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
+        } else {
+          value_init_date(&record_values[i],file_value.c_str());
+        }       
       } break;
       default: {
         errmsg << "Unsupported field type to loading: " << field->type();
