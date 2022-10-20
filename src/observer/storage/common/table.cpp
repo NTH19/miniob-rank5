@@ -256,8 +256,7 @@ RC Table::rollback_insert(Trx *trx, const RID &rid)
 RC Insert_Date_Checker(Value values){
   int dates=0;
   if(values.type==DATES){
-    dates = *(int*)values.data;
-    if(dates==-1)return RC::INVALID_ARGUMENT;
+    if(values.data==nullptr)return RC::INVALID_ARGUMENT;
   }
   return RC::SUCCESS;
 }
@@ -497,7 +496,7 @@ RC Table::make_record(int value_num, const Value *values, char *&record_out)
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value &value = values[i];
-    if (field->type() != value.type && (value.type == DATES || value.type == UNDEFINED)) {
+    if (field->type() != value.type && value.type == UNDEFINED) {
       LOG_ERROR("Invalid value type. table name =%s, field name=%s, type=%d, but given=%d",
           table_meta_.name(),
           field->name(),
@@ -528,6 +527,7 @@ RC Table::make_record(int value_num, const Value *values, char *&record_out)
       break;
     case DATES:
       memcpy(record + field->offset(), value.data, field->len());
+      break;
     default:
       rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
       break;

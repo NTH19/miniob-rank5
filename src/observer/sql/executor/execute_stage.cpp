@@ -595,26 +595,6 @@ RC ExecuteStage::do_insert(SQLStageEvent *sql_event)
 
   InsertStmt *insert_stmt = (InsertStmt *)stmt;
   Table *table = insert_stmt->table();
-  // for (const FilterUnit *filter_unit : insert_stmt->filter_stmt()->filter_units()) {
-  //   TupleCell cell;
-  //   RowTuple t;
-  //   if(dynamic_cast<ValueExpr*>(filter_unit->left())){
-  //     filter_unit->left()->get_value(t,cell);
-  //     auto p=cell.data();
-  //     if(p==nullptr){
-  //         session_event->set_response("FAILURE\n");
-  //         return RC::INVALID_ARGUMENT;
-  //     }
-  //   }
-  //   if(dynamic_cast<ValueExpr*>(filter_unit->right())){
-  //     filter_unit->right()->get_value(t,cell);
-  //     auto p=cell.data();
-  //     if(p==nullptr){
-  //         session_event->set_response("FAILURE\n");
-  //         return RC::INVALID_ARGUMENT;
-  //     }
-  //   }
-  // }
   const Value * v=insert_stmt->values();
   for(int i=0;i<insert_stmt->value_amount();i++){
     const Value * vm=v+i;
