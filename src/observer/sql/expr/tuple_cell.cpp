@@ -12,6 +12,8 @@ See the Mulan PSL v2 for more details. */
 // Created by WangYunlai on 2022/07/05.
 //
 
+#include <regex>
+
 #include "sql/expr/tuple_cell.h"
 #include "storage/common/field.h"
 #include "common/log/log.h"
@@ -133,4 +135,26 @@ int TupleCell::compare(const TupleCell &other) const
 
   LOG_WARN("not supported");
   return -1; // TODO return rc?
+}
+
+// "abc" like "_b%"
+bool TupleCell::like(const TupleCell &other) const
+{
+  if (this->attr_type_ != other.attr_type_ || this->attr_type_ != CHARS) {
+    LOG_WARN("not supported");
+    return false;
+  }
+
+  std::string left = charptr2string(this->data_, this->length_);
+  std::string right = charptr2string(other.data_, other.length_);
+  // replace '_' -> '.', '%' -> '.*?';
+  std::string::size_type pos(0);
+  while((pos = right.find('_')) != std::string::npos) {
+    right.replace(pos, 1, ".");
+  }
+  while((pos = right.find('%')) != std::string::npos) {
+    right.replace(pos, 1, ".*?");
+  }
+  std::regex reg(right);
+  return std::regex_match(left, reg);
 }

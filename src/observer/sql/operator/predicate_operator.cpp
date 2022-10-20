@@ -59,6 +59,8 @@ Tuple * PredicateOperator::current_tuple()
   return children_[0]->current_tuple();
 }
 
+
+
 bool PredicateOperator::do_predicate(RowTuple &tuple)
 {
   if (filter_stmt_ == nullptr || filter_stmt_->filter_units().empty()) {
@@ -74,7 +76,7 @@ bool PredicateOperator::do_predicate(RowTuple &tuple)
     left_expr->get_value(tuple, left_cell);
     right_expr->get_value(tuple, right_cell);
 
-    const int compare = left_cell.compare(right_cell);
+    const int compare = (comp >= LIKE_TO ? 0 : left_cell.compare(right_cell));
     bool filter_result = false;
     switch (comp) {
     case EQUAL_TO: {
@@ -94,6 +96,12 @@ bool PredicateOperator::do_predicate(RowTuple &tuple)
     } break;
     case GREAT_THAN: {
       filter_result = (compare > 0);
+    } break;
+    case LIKE_TO: {
+      filter_result = left_cell.like(right_cell);
+    } break;
+    case NOT_LIKE: {
+      filter_result = !left_cell.like(right_cell);
     } break;
     default: {
       LOG_WARN("invalid compare type: %d", comp);
