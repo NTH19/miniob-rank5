@@ -36,6 +36,8 @@ typedef enum {
   LESS_THAN,    //"<"     3
   GREAT_EQUAL,  //">="    4
   GREAT_THAN,   //">"     5
+  LIKE_TO,      //"like"
+  NOT_LIKE,     //"not like"          
   NO_OP
 } CompOp;
 
@@ -120,6 +122,11 @@ typedef struct {
   char *relation_name;  // Relation name
 } DropTable;
 
+typedef struct {
+  const char *relation_name;  // Index name
+} ShowIndex;
+
+
 // struct of create_index
 typedef struct {
   char *index_name;      // Index name
@@ -152,6 +159,7 @@ union Queries {
   DropIndex drop_index;
   DescTable desc_table;
   LoadData load_data;
+  ShowIndex show_index;
   char *errors;
 };
 
@@ -175,7 +183,8 @@ enum SqlCommandFlag {
   SCF_ROLLBACK,
   SCF_LOAD_DATA,
   SCF_HELP,
-  SCF_EXIT
+  SCF_EXIT,
+  SCF_SHOW_INDEXES
 };
 // struct of flag and sql_struct
 typedef struct Query {

@@ -257,6 +257,11 @@ void create_table_append_attribute(CreateTable *create_table, AttrInfo *attr_inf
   create_table->attributes[create_table->attribute_count++] = *attr_info;
 }
 
+void show_indexes_init(ShowIndex *s, const char *relation_name)
+{
+  s->relation_name = strdup(relation_name);
+}
+
 void create_table_init_name(CreateTable *create_table, const char *relation_name)
 {
   create_table->relation_name = strdup(relation_name);
