@@ -28,6 +28,8 @@ DIGIT            [0-9]+
 ID               [A-Za-z_]+[A-Za-z0-9_]*
 DOT              \.
 QUOTE            [\'\"]
+SINGLE_QUOTE     [\']
+DOUBLE_QUOTE     [\"]
 %x STR
 
 %%
@@ -71,6 +73,8 @@ QUOTE            [\'\"]
 [Ll][Oo][Aa][Dd]                                     RETURN_TOKEN(LOAD);
 [Dd][Aa][Tt][Aa]                                     RETURN_TOKEN(DATA);
 [Ii][Nn][Ff][Ii][Ll][Ee]                             RETURN_TOKEN(INFILE);
+[Nn][Oo][Tt]                                         RETURN_TOKEN(NOT);
+[Ll][Ii][Kk][Ee]                                     RETURN_TOKEN(LIKE);
 {ID}                                                 yylval->string=strdup(yytext); RETURN_TOKEN(ID);
 "("                                                  RETURN_TOKEN(LBRACE);
 ")"                                                  RETURN_TOKEN(RBRACE);
@@ -82,7 +86,8 @@ QUOTE            [\'\"]
 "<"                                                  RETURN_TOKEN(LT);
 ">="                                                 RETURN_TOKEN(GE);
 ">"                                                  RETURN_TOKEN(GT);
-{QUOTE}[\40\42\47A-Za-z0-9_/\.\-]*{QUOTE}            yylval->string=strdup(yytext); RETURN_TOKEN(SSS);
+{SINGLE_QUOTE}[\40\42A-Za-z0-9_/\.\-\%]*{SINGLE_QUOTE}  yylval->string=strdup(yytext); RETURN_TOKEN(SSS);
+{DOUBLE_QUOTE}[\40\47A-Za-z0-9_/\.\-\%]*{DOUBLE_QUOTE}  yylval->string=strdup(yytext); RETURN_TOKEN(SSS);
 
 .                                                    printf("Unknown character [%c]\n",yytext[0]); return yytext[0];
 %%

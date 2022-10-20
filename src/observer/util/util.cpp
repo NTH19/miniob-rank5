@@ -30,3 +30,8 @@ std::string double2string(double v)
 
   return std::string(buf, len);
 }
+
+std::string charptr2string(char *s, int length) {
+  std::string ss(s, length);
+  return std::string(s, strlen(ss.c_str()));
+}
