@@ -1707,7 +1707,7 @@ RC BplusTreeHandler::update_entry(const char *data, const RID *rid, const char *
   RC rc = RC::SUCCESS;
   rc = delete_entry(data, rid);
   if (rc != RC::SUCCESS) {
-    LOG_ERROR("Failed to update entry when delting old entry. ");
+    LOG_ERROR("Failed to update entry when deleting old entry. ");
     return rc;
   }
   return insert_entry(new_data, rid);

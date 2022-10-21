@@ -672,7 +672,8 @@ RC ExecuteStage::do_create_index(SQLStageEvent *sql_event)
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-  RC rc = table->create_index(nullptr, create_index.index_name, create_index.attribute_name);
+  RC rc = table->create_index(nullptr, create_index.index_name, 
+            create_index.attribute_name, create_index.attribute_count);
   sql_event->session_event()->set_response(rc == RC::SUCCESS ? "SUCCESS\n" : "FAILURE\n");
   return rc;
 }
@@ -797,7 +798,7 @@ RC ExecuteStage::do_insert(SQLStageEvent *sql_event)
   return rc;
 }
 RC ExecuteStage::do_update(UpdateStmt * update_stmt, SessionEvent *session_event){
-if (update_stmt == nullptr) {
+  if (update_stmt == nullptr) {
     LOG_WARN("cannot find statement");
     return RC::GENERIC_ERROR;
   }
