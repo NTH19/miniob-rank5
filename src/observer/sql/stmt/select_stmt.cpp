@@ -176,6 +176,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
   select_stmt->funs_.swap(funs);
   select_stmt->query_fields_.swap(query_fields);
   select_stmt->filter_stmt_ = filter_stmt;
+  select_stmt->need_reverse=select_sql.need_Revere;
   stmt = select_stmt;
   return RC::SUCCESS;
 }

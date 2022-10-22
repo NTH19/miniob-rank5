@@ -513,11 +513,12 @@ void init_ret_aggfun(
     }
   }
 }
-void p_mutiple_table_header(std::ostream &os, std::vector<ProjectOperator> &p)
+void p_mutiple_table_header(std::ostream &os, std::vector<ProjectOperator> &p,bool need_reverse)
 {
   int j = 0;
   int n=p.size();
-  for (int k=n-1;k>=0;--k) {
+  if(need_reverse){
+    for (int k=n-1;k>=0;--k) {
     const int cell_num = p[k].tuple_cell_num();
     const TupleCellSpec *cell_spec = nullptr;
     if (j) {
@@ -534,8 +535,29 @@ void p_mutiple_table_header(std::ostream &os, std::vector<ProjectOperator> &p)
       }
     }
   }
+  }else{
+    for (int k=0;k<n;++k) {
+    const int cell_num = p[k].tuple_cell_num();
+    const TupleCellSpec *cell_spec = nullptr;
+    if (j) {
+      os << " | ";
+    }
+    j++;
+    for (int i = 0; i < cell_num; i++) {
+      p[k].tuple_cell_spec_at(i, cell_spec);
+      if (i != 0) {
+        os << " | ";
+      }
+      if (cell_spec->alias()) {
+        os << cell_spec->alias();
+      }
+    }
+  }
+  }
+  
   os << "\n";
 }
+
 void dfs(std::vector<Table*>&tables,int step,const std::vector<Field>query_fields,
 RowTuple* lastTuple,std::string lastRes,std::ostream &os,std::map<std::pair<std::string,std::string>,std::tuple<FieldExpr*,FieldExpr*,CompOp>>&mtoF,
 std::map<std::string,ProjectOperator*>&tableToProject,FilterStmt* filter,bool needJoin,std::string lastTablename){
@@ -639,7 +661,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
       m[std::string(query_fields[i].table()->name())]=&project_oper[j];
     }
     project_oper.resize(accuse+1);
-    p_mutiple_table_header(ss, project_oper);
+    p_mutiple_table_header(ss, project_oper,select_stmt->need_reverse);
     std::reverse(tables.begin(),tables.end());
     dfs(tables,0,query_fields,nullptr,"",ss,mtoF,m,select_stmt->filter_stmt(),need_join,"0dummy");
     session_event->set_response(ss.str());
@@ -735,6 +757,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     LOG_WARN("failed to open operator");
     return rc;
   }
+
 
   std::stringstream ss;
   print_tuple_header(ss, project_oper);
