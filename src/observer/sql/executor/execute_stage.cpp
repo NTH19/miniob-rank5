@@ -49,8 +49,8 @@ See the Mulan PSL v2 for more details. */
 
 using namespace common;
 
-//RC create_selection_executor(
-//   Trx *trx, const Selects &selects, const char *db, const char *table_name, SelectExeNode &select_node);
+// RC create_selection_executor(
+//    Trx *trx, const Selects &selects, const char *db, const char *table_name, SelectExeNode &select_node);
 
 //! Constructor
 ExecuteStage::ExecuteStage(const char *tag) : Stage(tag)
@@ -137,88 +137,88 @@ void ExecuteStage::handle_request(common::StageEvent *event)
 
   if (stmt != nullptr) {
     switch (stmt->type()) {
-    case StmtType::SELECT: {
-      do_select(sql_event);
-    } break;
-    case StmtType::INSERT: {
-      do_insert(sql_event);
-    } break;
-    case StmtType::UPDATE: {
-      do_update((UpdateStmt *)stmt, session_event);
-    } break;
-    case StmtType::DELETE: {
-      do_delete(sql_event);
-    } break;
-    default: {
-      LOG_WARN("should not happen. please implenment");
-    } break;
+      case StmtType::SELECT: {
+        do_select(sql_event);
+      } break;
+      case StmtType::INSERT: {
+        do_insert(sql_event);
+      } break;
+      case StmtType::UPDATE: {
+        do_update((UpdateStmt *)stmt, session_event);
+      } break;
+      case StmtType::DELETE: {
+        do_delete(sql_event);
+      } break;
+      default: {
+        LOG_WARN("should not happen. please implenment");
+      } break;
     }
   } else {
     switch (sql->flag) {
-    case SCF_HELP: {
-      do_help(sql_event);
-    } break;
-    case SCF_CREATE_TABLE: {
-      do_create_table(sql_event);
-    } break;
-    case SCF_CREATE_INDEX: {
-      do_create_index(sql_event);
-    } break;
-    case SCF_SHOW_TABLES: {
-      do_show_tables(sql_event);
-    } break;
-    case SCF_SHOW_INDEXES: {
+      case SCF_HELP: {
+        do_help(sql_event);
+      } break;
+      case SCF_CREATE_TABLE: {
+        do_create_table(sql_event);
+      } break;
+      case SCF_CREATE_INDEX: {
+        do_create_index(sql_event);
+      } break;
+      case SCF_SHOW_TABLES: {
+        do_show_tables(sql_event);
+      } break;
+      case SCF_SHOW_INDEXES: {
         do_show_indexes(sql_event);
       } break;
-    case SCF_DESC_TABLE: {
-      do_desc_table(sql_event);
-    } break;
+      case SCF_DESC_TABLE: {
+        do_desc_table(sql_event);
+      } break;
 
-    case SCF_DROP_TABLE:
-      do_drop_table(sql_event);
-      break;
-    case SCF_DROP_INDEX:
-    case SCF_LOAD_DATA: {
-      default_storage_stage_->handle_event(event);
-    } break;
-    case SCF_SYNC: {
-      /*
-      RC rc = DefaultHandler::get_default().sync();
-      session_event->set_response(strrc(rc));
-      */
-    } break;
-    case SCF_BEGIN: {
-      do_begin(sql_event);
-      /*
-      session_event->set_response("SUCCESS\n");
-      */
-    } break;
-    case SCF_COMMIT: {
-      do_commit(sql_event);
-      /*
-      Trx *trx = session->current_trx();
-      RC rc = trx->commit();
-      session->set_trx_multi_operation_mode(false);
-      session_event->set_response(strrc(rc));
-      */
-    } break;
-    case SCF_CLOG_SYNC: {
-      do_clog_sync(sql_event);
-    }
-    case SCF_ROLLBACK: {
-      Trx *trx = session_event->get_client()->session->current_trx();
-      RC rc = trx->rollback();
-      session->set_trx_multi_operation_mode(false);
-      session_event->set_response(strrc(rc));
-    } break;
-    case SCF_EXIT: {
-      // do nothing
-      const char *response = "Unsupported\n";
-      session_event->set_response(response);
-    } break;
-    default: {
-      LOG_ERROR("Unsupported command=%d\n", sql->flag);
-    }
+      case SCF_DROP_TABLE:
+        do_drop_table(sql_event);
+        break;
+      case SCF_DROP_INDEX:
+      case SCF_LOAD_DATA: {
+        default_storage_stage_->handle_event(event);
+      } break;
+      case SCF_SYNC: {
+        /*
+        RC rc = DefaultHandler::get_default().sync();
+        session_event->set_response(strrc(rc));
+        */
+      } break;
+      case SCF_BEGIN: {
+        do_begin(sql_event);
+        /*
+        session_event->set_response("SUCCESS\n");
+        */
+      } break;
+      case SCF_COMMIT: {
+        do_commit(sql_event);
+        /*
+        Trx *trx = session->current_trx();
+        RC rc = trx->commit();
+        session->set_trx_multi_operation_mode(false);
+        session_event->set_response(strrc(rc));
+        */
+      } break;
+      case SCF_CLOG_SYNC: {
+        do_clog_sync(sql_event);
+      }
+      case SCF_ROLLBACK: {
+        Trx *trx = session_event->get_client()->session->current_trx();
+        RC rc = trx->rollback();
+        session->set_trx_multi_operation_mode(false);
+        session_event->set_response(strrc(rc));
+      } break;
+      case SCF_EXIT: {
+        // do nothing
+        const char *response = "Unsupported\n";
+        session_event->set_response(response);
+      } break;
+      default: {
+        LOG_ERROR("Unsupported command=%d\n", sql->flag);
+      }
     }
   }
 }
@@ -253,22 +253,36 @@ void print_tuple_header(std::ostream &os, const ProjectOperator &oper)
     os << '\n';
   }
 }
-void print_aggfun_header(std::ostream &os, const std::vector<std::pair<DescribeFun,Field>>& funs)
+void print_aggfun_header(std::ostream &os, const std::vector<std::pair<DescribeFun, Field>> &funs)
 {
-  
+
   for (int i = 0; i < funs.size(); i++) {
-    if (i != 0) os << " | ";
-    switch(funs[i].first){
-      case MAX: os<<" MAX("<<funs[i].second.field_name()<<") ";break;
-      case MIN: os<<" MIN("<<funs[i].second.field_name()<<") ";break;
-      case AVG: os<<" AVG("<<funs[i].second.field_name()<<") ";break;
-      case SUM: os<<" SUM("<<funs[i].second.field_name()<<") ";break;
-      case COUNT: os<<" COUNT("<<funs[i].second.field_name()<<") ";break;
-      case COUNT_STAR: os<<" COUNT(*)";break;
+    if (i != 0)
+      os << " | ";
+    switch (funs[i].first) {
+      case MAX:
+        os << " MAX(" << funs[i].second.field_name() << ") ";
+        break;
+      case MIN:
+        os << " MIN(" << funs[i].second.field_name() << ") ";
+        break;
+      case AVG:
+        os << " AVG(" << funs[i].second.field_name() << ") ";
+        break;
+      case SUM:
+        os << " SUM(" << funs[i].second.field_name() << ") ";
+        break;
+      case COUNT:
+        os << " COUNT(" << funs[i].second.field_name() << ") ";
+        break;
+      case COUNT_STAR:
+        os << " COUNT(*)";
+        break;
     }
   }
-    os << '\n';
+  os << '\n';
 }
+
 void tuple_to_string(std::ostream &os, const Tuple &tuple)
 {
   TupleCell cell;
@@ -293,7 +307,7 @@ void tuple_to_string(std::ostream &os, const Tuple &tuple)
 IndexScanOperator *try_to_create_index_scan_operator(FilterStmt *filter_stmt)
 {
   const std::vector<FilterUnit *> &filter_units = filter_stmt->filter_units();
-  if (filter_units.empty() ) {
+  if (filter_units.empty()) {
     return nullptr;
   }
 
@@ -302,7 +316,7 @@ IndexScanOperator *try_to_create_index_scan_operator(FilterStmt *filter_stmt)
   // 这里的查找规则是比较简单的，就是尽量找到使用相等比较的索引
   // 如果没有就找范围比较的，但是直接排除不等比较的索引查询. (你知道为什么?)
   const FilterUnit *better_filter = nullptr;
-  for (const FilterUnit * filter_unit : filter_units) {
+  for (const FilterUnit *filter_unit : filter_units) {
     if (filter_unit->comp() == NOT_EQUAL) {
       continue;
     }
@@ -325,7 +339,7 @@ IndexScanOperator *try_to_create_index_scan_operator(FilterStmt *filter_stmt)
         better_filter = filter_unit;
       } else if (filter_unit->comp() == EQUAL_TO) {
         better_filter = filter_unit;
-    	break;
+        break;
       }
     }
   }
@@ -340,18 +354,29 @@ IndexScanOperator *try_to_create_index_scan_operator(FilterStmt *filter_stmt)
   if (left->type() == ExprType::VALUE && right->type() == ExprType::FIELD) {
     std::swap(left, right);
     switch (comp) {
-    case EQUAL_TO:    { comp = EQUAL_TO; }    break;
-    case LESS_EQUAL:  { comp = GREAT_THAN; }  break;
-    case NOT_EQUAL:   { comp = NOT_EQUAL; }   break;
-    case LESS_THAN:   { comp = GREAT_EQUAL; } break;
-    case GREAT_EQUAL: { comp = LESS_THAN; }   break;
-    case GREAT_THAN:  { comp = LESS_EQUAL; }  break;
-    default: {
-    	LOG_WARN("should not happen");
-    }
+      case EQUAL_TO: {
+        comp = EQUAL_TO;
+      } break;
+      case LESS_EQUAL: {
+        comp = GREAT_THAN;
+      } break;
+      case NOT_EQUAL: {
+        comp = NOT_EQUAL;
+      } break;
+      case LESS_THAN: {
+        comp = GREAT_EQUAL;
+      } break;
+      case GREAT_EQUAL: {
+        comp = LESS_THAN;
+      } break;
+      case GREAT_THAN: {
+        comp = LESS_EQUAL;
+      } break;
+      default: {
+        LOG_WARN("should not happen");
+      }
     }
   }
-
 
   FieldExpr &left_field_expr = *(FieldExpr *)left;
   const Field &field = left_field_expr.field();
@@ -369,53 +394,54 @@ IndexScanOperator *try_to_create_index_scan_operator(FilterStmt *filter_stmt)
   bool right_inclusive = false;
 
   switch (comp) {
-  case EQUAL_TO: {
-    left_cell = &value;
-    right_cell = &value;
-    left_inclusive = true;
-    right_inclusive = true;
-  } break;
+    case EQUAL_TO: {
+      left_cell = &value;
+      right_cell = &value;
+      left_inclusive = true;
+      right_inclusive = true;
+    } break;
 
-  case LESS_EQUAL: {
-    left_cell = nullptr;
-    left_inclusive = false;
-    right_cell = &value;
-    right_inclusive = true;
-  } break;
+    case LESS_EQUAL: {
+      left_cell = nullptr;
+      left_inclusive = false;
+      right_cell = &value;
+      right_inclusive = true;
+    } break;
 
-  case LESS_THAN: {
-    left_cell = nullptr;
-    left_inclusive = false;
-    right_cell = &value;
-    right_inclusive = false;
-  } break;
+    case LESS_THAN: {
+      left_cell = nullptr;
+      left_inclusive = false;
+      right_cell = &value;
+      right_inclusive = false;
+    } break;
 
-  case GREAT_EQUAL: {
-    left_cell = &value;
-    left_inclusive = true;
-    right_cell = nullptr;
-    right_inclusive = false;
-  } break;
+    case GREAT_EQUAL: {
+      left_cell = &value;
+      left_inclusive = true;
+      right_cell = nullptr;
+      right_inclusive = false;
+    } break;
 
-  case GREAT_THAN: {
-    left_cell = &value;
-    left_inclusive = false;
-    right_cell = nullptr;
-    right_inclusive = false;
-  } break;
+    case GREAT_THAN: {
+      left_cell = &value;
+      left_inclusive = false;
+      right_cell = nullptr;
+      right_inclusive = false;
+    } break;
 
-  default: {
-    LOG_WARN("should not happen. comp=%d", comp);
-  } break;
+    default: {
+      LOG_WARN("should not happen. comp=%d", comp);
+    } break;
   }
 
-  IndexScanOperator *oper = new IndexScanOperator(table, index,
-       left_cell, left_inclusive, right_cell, right_inclusive);
+  IndexScanOperator *oper = new IndexScanOperator(table, index, left_cell, left_inclusive, right_cell, right_inclusive);
 
   LOG_INFO("use index for scan: %s in table %s", index->index_meta().name(), table->name());
   return oper;
 }
-void do_aggfun(std::vector<int>&ret, std::vector<int>&char_len,const Tuple &tuple,const std::vector<std::pair<DescribeFun,Field>>& funs){
+void do_aggfun(std::vector<int> &ret, std::vector<int> &char_len, const Tuple &tuple,
+    const std::vector<std::pair<DescribeFun, Field>> &funs)
+{
   TupleCell cell;
   RC rc = RC::SUCCESS;
   for (int i = 0; i < tuple.cell_num(); i++) {
@@ -424,84 +450,228 @@ void do_aggfun(std::vector<int>&ret, std::vector<int>&char_len,const Tuple &tupl
       LOG_WARN("failed to fetch field of cell. index=%d, rc=%s", i, strrc(rc));
       break;
     }
-    cell.do_aggfun(ret[i],funs[i].first,char_len[i]);
+    cell.do_aggfun(ret[i], funs[i].first, char_len[i]);
   }
 }
-void gen_result(std::vector<int>&ret,const std::vector<std::pair<DescribeFun,Field>>& funs,std::ostream &os,int cnt ,std::vector<int>& char_len){
-  bool is_first=true;
-  for(int i=0;i<ret.size();++i){
-    if(is_first){
-      is_first=false;
-    } else os<<" | ";
-    if(funs[i].first==AVG){
-      os<<(float)ret[i]/cnt;
+void gen_result(std::vector<int> &ret, const std::vector<std::pair<DescribeFun, Field>> &funs, std::ostream &os,
+    int cnt, std::vector<int> &char_len)
+{
+  bool is_first = true;
+  for (int i = 0; i < ret.size(); ++i) {
+    if (is_first) {
+      is_first = false;
+    } else
+      os << " | ";
+    if (funs[i].first == AVG) {
+      os << (float)ret[i] / cnt;
       continue;
     }
-    if(funs[i].first==COUNT ||funs[i].first==COUNT_STAR){
-      os<<cnt;
+    if (funs[i].first == COUNT || funs[i].first == COUNT_STAR) {
+      os << cnt;
       continue;
     }
-    switch (funs[i].second.attr_type())
-    {
-    case FLOATS:
-      os<<*(float*)&ret[i];
-      break;
-    case INTS:
-      os<<ret[i];
-      break;
-    case CHARS:
-      os<<std::string((char*)&ret[i],char_len[i]);
-      break;
+    switch (funs[i].second.attr_type()) {
+      case FLOATS:
+        os << *(float *)&ret[i];
+        break;
+      case INTS:
+        os << ret[i];
+        break;
+      case CHARS:
+        os << std::string((char *)&ret[i], char_len[i]);
+        break;
     }
   }
-  os<<"\n";
+  os << "\n";
 }
-void init_ret_aggfun(std::vector<int>&ret,const std::vector<std::pair<DescribeFun,Field>>& funs,std::vector<int>&char_len){
-  int n=ret.size();
-  for(int i=0;i<n;++i){
-    if(funs[i].first== MIN){
-      if(funs[i].second.attr_type()==CHARS){
-        memset(&ret[i],127,4);
-        char_len[i]=3;
-      }else if(funs[i].second.attr_type()==FLOATS){
-        *(float*)&ret[i]=99999999;
-      }else if(funs[i].second.attr_type()==INTS){
-        ret[i]=INT32_MAX;
+void init_ret_aggfun(
+    std::vector<int> &ret, const std::vector<std::pair<DescribeFun, Field>> &funs, std::vector<int> &char_len)
+{
+  int n = ret.size();
+  for (int i = 0; i < n; ++i) {
+    if (funs[i].first == MIN) {
+      if (funs[i].second.attr_type() == CHARS) {
+        memset(&ret[i], 127, 4);
+        char_len[i] = 3;
+      } else if (funs[i].second.attr_type() == FLOATS) {
+        *(float *)&ret[i] = 99999999;
+      } else if (funs[i].second.attr_type() == INTS) {
+        ret[i] = INT32_MAX;
       }
-    }else if(funs[i].first== MAX){
-      if(funs[i].second.attr_type()==CHARS){
-        memset(&ret[i],0,4);
-        char_len[i]=3;
-      }else if(funs[i].second.attr_type()==FLOATS){
-        *(float*)&ret[i]=0;
-      }else if(funs[i].second.attr_type()==INTS){
-        ret[i]=-100000;
-      } 
-    }else if(funs[i].first== SUM ||funs[i].first== AVG ){
-      ret[i]=0;
+    } else if (funs[i].first == MAX) {
+      if (funs[i].second.attr_type() == CHARS) {
+        memset(&ret[i], 0, 4);
+        char_len[i] = 3;
+      } else if (funs[i].second.attr_type() == FLOATS) {
+        *(float *)&ret[i] = 0;
+      } else if (funs[i].second.attr_type() == INTS) {
+        ret[i] = -100000;
+      }
+    } else if (funs[i].first == SUM || funs[i].first == AVG) {
+      ret[i] = 0;
     }
   }
+}
+void p_mutiple_table_header(std::ostream &os, std::vector<ProjectOperator> &p)
+{
+  int j = 0;
+  for (auto &oper : p) {
+    const int cell_num = oper.tuple_cell_num();
+    const TupleCellSpec *cell_spec = nullptr;
+    if (j) {
+      os << " | ";
+    }
+    j++;
+    for (int i = 0; i < cell_num; i++) {
+      oper.tuple_cell_spec_at(i, cell_spec);
+      if (i != 0) {
+        os << " | ";
+      }
+      if (cell_spec->alias()) {
+        os << cell_spec->alias();
+      }
+    }
+  }
+  os << "\n";
 }
 RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 {
   SelectStmt *select_stmt = (SelectStmt *)(sql_event->stmt());
   SessionEvent *session_event = sql_event->session_event();
   RC rc = RC::SUCCESS;
-  if (select_stmt->tables().size() != 1) {
-    LOG_WARN("select more than 1 tables is not supported");
-    rc = RC::UNIMPLENMENT;
+  // select mutiple tables happens here
+  if (select_stmt->tables().size() > 1) {
+    auto tables = select_stmt->tables();
+    auto cons = select_stmt->filter_stmt()->filter_units();
+    FieldExpr *left_attr;
+    FieldExpr *right_attr;
+    bool need_join = false;
+    for (int i = 0; i < cons.size(); ++i) {
+      if (dynamic_cast<FieldExpr *>(cons[0]->left()) != 0 && dynamic_cast<FieldExpr *>(cons[0]->right()) != 0) {
+        left_attr = dynamic_cast<FieldExpr *>(cons[0]->left());
+        right_attr = dynamic_cast<FieldExpr *>(cons[0]->right());
+        need_join = true;
+      }
+    }
+
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to open operator");
+      return rc;
+    }
+    std::stringstream ss;
+    std::vector<ProjectOperator> project_oper(10);
+    auto &query_fields = select_stmt->query_fields();
+    std::map<std::string,ProjectOperator*>m;
+    int accuse;
+    for (int i = 0, j = 0; i < query_fields.size(); ++i) {
+      if (i && query_fields[i].table_name() != query_fields[i - 1].table_name()) {
+        j++;
+        // project_oper.push_back(ProjectOperator());
+      }
+      accuse=j;
+      project_oper[j].add_projection(query_fields[i].table(), query_fields[i].meta(), true);
+      m[std::string(query_fields[i].table()->name())]=&project_oper[j];
+    }
+    project_oper.resize(accuse+1);
+    p_mutiple_table_header(ss, project_oper);
+    if (!need_join) {
+      int n=tables.size();
+      for(int i=0;i<n;++i){
+        auto scan_oper = new TableScanOperator(tables[i]);
+        auto pred_oper=new PredicateOperator (select_stmt->filter_stmt());
+        pred_oper->add_child(scan_oper);
+        m[std::string(tables[i]->name())]->add_child(pred_oper);
+        m[std::string(tables[i]->name())]->open();
+      }
+      std::vector<bool>p_space(accuse,false);
+      while(true){
+        bool has=false;
+        for(int i =0;i<n;++i){
+          if((rc = project_oper[i].next()) == RC::SUCCESS){
+            has=true;
+            p_space[i]=true;
+          }
+        }
+        if(!has)break;
+        bool is_first=true;
+        for(int i=0;i<n;++i){
+          Tuple *tuple = project_oper[i].current_tuple();
+          if(is_first){
+            is_first=false;
+          }else ss<<" | ";
+          if (nullptr == tuple) {
+            rc = RC::INTERNAL;
+            LOG_WARN("failed to get current record. rc=%s", strrc(rc));
+            break;
+          }
+          if(p_space[i]){
+            tuple_to_string(ss, *tuple);
+            p_space[i]=false;
+          }else ss<<" ";
+        }
+        ss << std::endl;
+      }
+      session_event->set_response(ss.str());
+      return RC::SUCCESS;
+    }
+    if (std::string(query_fields[0].table_name()) != std::string(tables[0]->name()))
+      std::swap(tables[0], tables[1]);
+    Operator *scan_oper = new TableScanOperator(tables[0]);
+    DEFER([&]() { delete scan_oper; });
+    PredicateOperator pred_oper(select_stmt->filter_stmt());
+    pred_oper.add_child(scan_oper);
+    rc = pred_oper.open();
+    
+    
+    while ((rc = pred_oper.next()) == RC::SUCCESS) {
+      RowTuple *tuple1 = dynamic_cast<RowTuple *>(pred_oper.current_tuple());
+
+      if (nullptr == tuple1) {
+        rc = RC::INTERNAL;
+        LOG_WARN("failed to get current record. rc=%s", strrc(rc));
+        break;
+      }
+
+      Operator *scan_oper2 = new TableScanOperator(tables[1]);
+      DEFER([&]() { delete scan_oper2; });
+      PredicateOperator pred_oper2(select_stmt->filter_stmt());
+      pred_oper2.add_child(scan_oper2);
+      pred_oper2.open();
+      while ((rc = pred_oper2.next()) == RC::SUCCESS) {
+        RowTuple *tuple2 = dynamic_cast<RowTuple *>(pred_oper2.current_tuple());
+        if (nullptr == tuple2) {
+          rc = RC::INTERNAL;
+          LOG_WARN("failed to get current record. rc=%s", strrc(rc));
+          break;
+        }
+        if (memcmp(tuple1->record().data() + left_attr->field().meta()->offset(),
+                tuple2->record().data() + left_attr->field().meta()->offset(),
+                4) == 0) {
+          auto p1 = dynamic_cast<ProjectTuple *>(project_oper[0].for_mu_tables());
+          auto p2 = dynamic_cast<ProjectTuple *>(project_oper[1].for_mu_tables());
+          p1->set_tuple(tuple1);
+          p2->set_tuple(tuple2);
+          tuple_to_string(ss, *p1);
+          ss << " | ";
+          tuple_to_string(ss, *p2);
+          ss << "\n";
+        }
+      }
+    }
+    session_event->set_response(ss.str());
     return rc;
   }
-  //agg  fun happens here
-  if(select_stmt->funs().size()!=0){
-    auto funs=select_stmt->funs();
-    Operator *scan_oper =new TableScanOperator(select_stmt->tables()[0]);
-    DEFER([&] () {delete scan_oper;});
+
+  // agg  fun happens here
+  if (select_stmt->funs().size() != 0) {
+    auto funs = select_stmt->funs();
+    Operator *scan_oper = new TableScanOperator(select_stmt->tables()[0]);
+    DEFER([&]() { delete scan_oper; });
     PredicateOperator pred_oper(select_stmt->filter_stmt());
     pred_oper.add_child(scan_oper);
     ProjectOperator project_oper;
     project_oper.add_child(&pred_oper);
-    for (int i=0;i<funs.size();++i) {
+    for (int i = 0; i < funs.size(); ++i) {
       project_oper.add_projection(funs[i].second.table(), funs[i].second.meta());
     }
     rc = project_oper.open();
@@ -511,53 +681,53 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     }
     std::stringstream ss;
     print_aggfun_header(ss, funs);
-    std::vector<int>ret(funs.size(),0);
-    std::vector<int>char_len(funs.size(),0);
-    init_ret_aggfun(ret,funs,char_len);
-    int cnt=0;
+    std::vector<int> ret(funs.size(), 0);
+    std::vector<int> char_len(funs.size(), 0);
+    init_ret_aggfun(ret, funs, char_len);
+    int cnt = 0;
     while ((rc = project_oper.next()) == RC::SUCCESS) {
-    // get current record
-    // write to response
-    Tuple * tuple = project_oper.current_tuple();
-    if (nullptr == tuple) {
-      rc = RC::INTERNAL;
-      LOG_WARN("failed to get current record. rc=%s", strrc(rc));
-      break;
+      // get current record
+      // write to response
+      Tuple *tuple = project_oper.current_tuple();
+      if (nullptr == tuple) {
+        rc = RC::INTERNAL;
+        LOG_WARN("failed to get current record. rc=%s", strrc(rc));
+        break;
+      }
+      do_aggfun(ret, char_len, *tuple, funs);
+      cnt++;
     }
-    do_aggfun(ret,char_len, *tuple,funs);
-    cnt++;
+
+    if (rc != RC::RECORD_EOF) {
+      LOG_WARN("something wrong while iterate operator. rc=%s", strrc(rc));
+      project_oper.close();
+    } else {
+      rc = project_oper.close();
+    }
+    gen_result(ret, funs, ss, cnt, char_len);
+
+    session_event->set_response(ss.str());
+    return rc;
   }
 
-  if (rc != RC::RECORD_EOF) {
-    LOG_WARN("something wrong while iterate operator. rc=%s", strrc(rc));
-    project_oper.close();
-  } else {
-    rc = project_oper.close();
-  }
-  gen_result(ret, funs,ss,cnt,char_len);
-
-  session_event->set_response(ss.str());
-  return rc;
-  }
-
-  //check whether is valid (maybe just for date)
+  // check whether is valid (maybe just for date)
   for (const FilterUnit *filter_unit : select_stmt->filter_stmt()->filter_units()) {
     TupleCell cell;
     RowTuple t;
-    if(dynamic_cast<ValueExpr*>(filter_unit->left())){
-      filter_unit->left()->get_value(t,cell);
-      auto p=cell.data();
-      if(p==nullptr){
-          session_event->set_response("FAILURE\n");
-          return RC::INVALID_ARGUMENT;
+    if (dynamic_cast<ValueExpr *>(filter_unit->left())) {
+      filter_unit->left()->get_value(t, cell);
+      auto p = cell.data();
+      if (p == nullptr) {
+        session_event->set_response("FAILURE\n");
+        return RC::INVALID_ARGUMENT;
       }
     }
-    if(dynamic_cast<ValueExpr*>(filter_unit->right())){
-      filter_unit->right()->get_value(t,cell);
-      auto p=cell.data();
-      if(p==nullptr){
-          session_event->set_response("FAILURE\n");
-          return RC::INVALID_ARGUMENT;
+    if (dynamic_cast<ValueExpr *>(filter_unit->right())) {
+      filter_unit->right()->get_value(t, cell);
+      auto p = cell.data();
+      if (p == nullptr) {
+        session_event->set_response("FAILURE\n");
+        return RC::INVALID_ARGUMENT;
       }
     }
   }
@@ -567,7 +737,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     scan_oper = new TableScanOperator(select_stmt->tables()[0]);
   }
 
-  DEFER([&] () {delete scan_oper;});
+  DEFER([&]() { delete scan_oper; });
 
   PredicateOperator pred_oper(select_stmt->filter_stmt());
   pred_oper.add_child(scan_oper);
@@ -587,7 +757,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   while ((rc = project_oper.next()) == RC::SUCCESS) {
     // get current record
     // write to response
-    Tuple * tuple = project_oper.current_tuple();
+    Tuple *tuple = project_oper.current_tuple();
     if (nullptr == tuple) {
       rc = RC::INTERNAL;
       LOG_WARN("failed to get current record. rc=%s", strrc(rc));
@@ -624,12 +794,12 @@ RC ExecuteStage::do_help(SQLStageEvent *sql_event)
 }
 RC ExecuteStage::do_drop_table(SQLStageEvent *sql_event)
 {
-  /* 
+  /*
   const CreateTable &create_table = sql_event->query()->sstr.create_table;
   SessionEvent *session_event = sql_event->session_event();
   Db *db = session_event->session()->get_current_db();
   RC rc = db->create_table(create_table.relation_name,
-			create_table.attribute_count, create_table.attributes);
+            create_table.attribute_count, create_table.attributes);
   if (rc == RC::SUCCESS) {
     session_event->set_response("SUCCESS\n");
   } else {
@@ -652,8 +822,7 @@ RC ExecuteStage::do_create_table(SQLStageEvent *sql_event)
   const CreateTable &create_table = sql_event->query()->sstr.create_table;
   SessionEvent *session_event = sql_event->session_event();
   Db *db = session_event->session()->get_current_db();
-  RC rc = db->create_table(create_table.relation_name,
-			create_table.attribute_count, create_table.attributes);
+  RC rc = db->create_table(create_table.relation_name, create_table.attribute_count, create_table.attributes);
   if (rc == RC::SUCCESS) {
     session_event->set_response("SUCCESS\n");
   } else {
@@ -746,30 +915,30 @@ RC ExecuteStage::do_insert(SQLStageEvent *sql_event)
 
   InsertStmt *insert_stmt = (InsertStmt *)stmt;
   Table *table = insert_stmt->table();
-  int j=insert_stmt->record_num();
-  for(int k=0;k<j;k++){
-  const Value * v=insert_stmt->values_[k];
-  for(int i=0;i<insert_stmt->value_amount();i++){
-    const Value * vm=v+i;
-    if(vm->data==nullptr){
-      session_event->set_response("FAILURE\n");
-      return RC::INVALID_ARGUMENT;
+  int j = insert_stmt->record_num();
+  for (int k = 0; k < j; k++) {
+    const Value *v = insert_stmt->values_[k];
+    for (int i = 0; i < insert_stmt->value_amount(); i++) {
+      const Value *vm = v + i;
+      if (vm->data == nullptr) {
+        session_event->set_response("FAILURE\n");
+        return RC::INVALID_ARGUMENT;
+      }
     }
   }
- }
-  const Inserts &inserts = sql_event->query()->sstr.insertion;//get inserts
-  int cnt = table->table_meta().field_num() - table->table_meta().sys_field_num();//check length
-  for(int i = 0,j = 0;i < inserts.record_num;i++,j=inserts.record_length[i-1]){
-    if(inserts.record_length[i] - j != cnt){
-      LOG_ERROR("record %d has wrong length %d - %d should be %d",i ,inserts.record_length[i], j, cnt);
+  const Inserts &inserts = sql_event->query()->sstr.insertion;                      // get inserts
+  int cnt = table->table_meta().field_num() - table->table_meta().sys_field_num();  // check length
+  for (int i = 0, j = 0; i < inserts.record_num; i++, j = inserts.record_length[i - 1]) {
+    if (inserts.record_length[i] - j != cnt) {
+      LOG_ERROR("record %d has wrong length %d - %d should be %d", i, inserts.record_length[i], j, cnt);
       end_trx_if_need(session, trx, false);
       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }
   }
 
-  RC rc = table->insert_records(trx,(int)inserts.record_num,(int)inserts.value_num,inserts.values);
+  RC rc = table->insert_records(trx, (int)inserts.record_num, (int)inserts.value_num, inserts.values);
 
-  //rc = table->insert_record(trx, insert_stmt->value_amount(), insert_stmt->values());
+  // rc = table->insert_record(trx, insert_stmt->value_amount(), insert_stmt->values());
   if (rc == RC::SUCCESS) {
     if (!session->is_trx_multi_operation_mode()) {
       CLogRecord *clog_record = nullptr;
@@ -783,7 +952,7 @@ RC ExecuteStage::do_insert(SQLStageEvent *sql_event)
       if (rc != RC::SUCCESS) {
         session_event->set_response("FAILURE\n");
         return rc;
-      } 
+      }
 
       trx->next_current_id();
       session_event->set_response("SUCCESS\n");
@@ -796,18 +965,19 @@ RC ExecuteStage::do_insert(SQLStageEvent *sql_event)
   }
   return rc;
 }
-RC ExecuteStage::do_update(UpdateStmt * update_stmt, SessionEvent *session_event){
-if (update_stmt == nullptr) {
+RC ExecuteStage::do_update(UpdateStmt *update_stmt, SessionEvent *session_event)
+{
+  if (update_stmt == nullptr) {
     LOG_WARN("cannot find statement");
     return RC::GENERIC_ERROR;
   }
-  RC rc=RC::SUCCESS;
+  RC rc = RC::SUCCESS;
   Session *session = session_event->session();
   Db *db = session->get_current_db();
   Trx *trx = session->current_trx();
   CLogManager *clog_manager = db->get_clog_manager();
   TableScanOperator scan_oper(update_stmt->table());
-  //todo
+  // todo
   PredicateOperator pred_oper(update_stmt->filter_stmt());
   pred_oper.add_child(&scan_oper);
   UpdateOperator update_oper(update_stmt);
@@ -829,7 +999,7 @@ if (update_stmt == nullptr) {
       if (rc != RC::SUCCESS) {
         session_event->set_response("FAILURE\n");
         return rc;
-      } 
+      }
       trx->next_current_id();
       session_event->set_response("SUCCESS\n");
     }
@@ -875,7 +1045,7 @@ RC ExecuteStage::do_delete(SQLStageEvent *sql_event)
       if (rc != RC::SUCCESS) {
         session_event->set_response("FAILURE\n");
         return rc;
-      } 
+      }
 
       trx->next_current_id();
       session_event->set_response("SUCCESS\n");

@@ -131,7 +131,7 @@ public:
       const FieldExpr * field_expr = (const FieldExpr *)speces_[i]->expression();
       const Field &field = field_expr->field();
       if (0 == strcmp(field_name, field.field_name())) {
-	return cell_at(i, cell);
+	      return cell_at(i, cell);
       }
     }
     return RC::NOTFOUND;
@@ -212,7 +212,6 @@ public:
     const TupleCellSpec *spec = speces_[index];
     return spec->expression()->get_value(*tuple_, cell);
   }
-
   RC find_cell(const Field &field, TupleCell &cell) const override
   {
     return tuple_->find_cell(field, cell);

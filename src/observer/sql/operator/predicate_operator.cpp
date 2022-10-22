@@ -70,11 +70,13 @@ bool PredicateOperator::do_predicate(RowTuple &tuple)
   for (const FilterUnit *filter_unit : filter_stmt_->filter_units()) {
     Expression *left_expr = filter_unit->left();
     Expression *right_expr = filter_unit->right();
+    if(dynamic_cast<FieldExpr*>(left_expr)!=0&&dynamic_cast<FieldExpr*>(right_expr)!=0)continue;
     CompOp comp = filter_unit->comp();
     TupleCell left_cell;
     TupleCell right_cell;
-    left_expr->get_value(tuple, left_cell);
-    right_expr->get_value(tuple, right_cell);
+
+    if(left_expr->get_value(tuple, left_cell)==RC::NOTFOUND)continue;
+    if(right_expr->get_value(tuple, right_cell)==RC::NOTFOUND)continue;
 
     const int compare = (comp >= LIKE_TO ? 0 : left_cell.compare(right_cell));
     bool filter_result = false;
