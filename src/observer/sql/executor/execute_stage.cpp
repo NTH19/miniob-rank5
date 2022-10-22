@@ -572,7 +572,7 @@ std::map<std::string,ProjectOperator*>&tableToProject,FilterStmt* filter,bool ne
       LOG_ERROR("DFS empty\n!!!!!");
       break;
     }
-      bool canAdd=false;
+    bool canAdd=false;
     if(needJoin){
       if(mtoF.count(std::pair<std::string,std::string>(lastTablename,nowTablename))){
         auto [l,r,cmp]= mtoF[std::pair<std::string,std::string>(lastTablename,nowTablename)];
@@ -606,14 +606,20 @@ std::map<std::string,ProjectOperator*>&tableToProject,FilterStmt* filter,bool ne
       }else canAdd=true;
     }else canAdd=true;
     if(canAdd){
-      auto p2=dynamic_cast<ProjectTuple *>(tableToProject[nowTablename]->for_mu_tables());
-      p2->set_tuple(tuple);
+      ProjectTuple* p2;
       std::stringstream kl; 
-      tuple_to_string(kl, *p2);
-      std::string temp(kl.str());
-      auto x=temp.data();
-      if(step!=tables.size()-1)dfs(tables,step+1,query_fields,tuple,lastRes+(step==0?"":" | ")+temp,os,mtoF,tableToProject,filter,needJoin,nowTablename);
-      else os<<lastRes+(step==0?"":" | ")+temp<<"\n";
+      if(tableToProject.count(nowTablename)){
+        p2=dynamic_cast<ProjectTuple *>(tableToProject[nowTablename]->for_mu_tables());
+        p2->set_tuple(tuple);
+        tuple_to_string(kl, *p2);
+        std::string temp(kl.str());
+        if(step!=tables.size()-1)dfs(tables,step+1,query_fields,tuple,lastRes+(step==0?"":" | ")+temp,os,mtoF,tableToProject,filter,needJoin,nowTablename);
+        else os<<lastRes+((step==0 ||lastRes.size()==0)?"":" | ")+temp<<"\n";
+      }else {
+        if(step!=tables.size()-1)dfs(tables,step+1,query_fields,tuple,lastRes,os,mtoF,tableToProject,filter,needJoin,nowTablename);
+        else os<<lastRes;
+      }
+      
     }
   }
   pred_oper->close();
