@@ -569,6 +569,17 @@ RC Table::make_record(int value_num, const Value *values, char *&record_out)
     case DATES:
       memcpy(record + field->offset(), value.data, field->len());
       break;
+    case TEXTS:{
+      char *s = (char*)(value.data);
+      size_t len = strlen(s);
+      if (len > 4096) {
+        s = (char*)malloc(sizeof(char) * 4097);
+        s[4096] = 0;
+      } else s=(char*)malloc(len);
+      memcpy(s, value.data, len>4096?4096:len+1);
+      int result = insert_text(s);
+      memcpy(record + field->offset(), &result, field->len());
+    }break;
     default:
       rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
       break;
@@ -895,9 +906,27 @@ public:
         if (record_data_size > attr_data_size_) {
           record_data_size = attr_data_size_;
         }
-      }
       memcpy(new_record_data, record.data(), record_size);
       memcpy(new_record_data + field_meta_->offset(), value_.data, record_data_size);
+      }
+      else if(field_meta_->type() == TEXTS){
+        char *s;
+        if (strlen((char*)(value_.data)) > 4096) {
+        s = (char*)malloc(sizeof(char) * 4097);
+        memcpy(s, value_.data, 4096);
+        s[4096] = 0;
+        } else {
+        s = (char*)malloc(sizeof(char) * (strlen((char*)(value_.data)) + 1));
+        memcpy(s, value_.data, strlen((char*)(value_.data)) + 1);
+        }
+        int result = table_.insert_text(s);
+        memcpy(new_record_data, record.data(), record_size);
+        memcpy(new_record_data + field_meta_->offset(), &result, field_meta_->len());
+      }
+      else{
+      memcpy(new_record_data, record.data(), record_size);
+      memcpy(new_record_data + field_meta_->offset(), value_.data, record_data_size);
+      }
       rc = table_.update_record(trx_, &record, attribute_name_, new_record_data);
       
     }
@@ -955,22 +984,6 @@ static RC record_reader_update_adapter(Record *record, void *context) {
 RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value, int condition_num,
     const Condition conditions[], int *updated_count)
 {
-  // return RC::GENERIC_ERROR;
-  // check  whether the conditions is valid
-  // for (int i = 0; i < condition_num; i++) {
-  //   char *condition_attribute_name;
-  //   if (conditions[i].left_is_attr) {
-  //     condition_attribute_name = conditions[i].left_attr.attribute_name;
-  //   }
-  //   else {
-  //     condition_attribute_name = conditions[i].right_attr.attribute_name;
-  //   }
-  //   const FieldMeta *field_meta = table_meta_.field(condition_attribute_name);
-  //   if (nullptr == field_meta) {
-  //     LOG_WARN("No such field in conidtions. %s.%s", name(), condition_attribute_name);
-  //     return RC::SCHEMA_FIELD_MISSING;
-  //   }
-  // }
   RC rc = RC::SUCCESS;
   CompositeConditionFilter filter;
   filter.init(*this, conditions, condition_num);
@@ -985,6 +998,7 @@ RC Table::update_record(Trx *trx, const char *attribute_name, const Value *value
   if (rc != RC::SUCCESS) {
     return rc;
   }
+
   rc = updater.do_update();
   if (updated_count != nullptr) {
     *updated_count = updater.updated_count();

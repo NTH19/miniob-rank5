@@ -93,6 +93,7 @@ ParserContext *get_context(yyscan_t scanner)
         STRING_T
         FLOAT_T
 		DATE_T
+		TEXT_T
         HELP
         EXIT
         DOT //QUOTE
@@ -290,6 +291,7 @@ number:
 type:
 	INT_T { $$=INTS; }
 	   | DATE_T { $$=DATES; }
+	   | TEXT_T { $$=TEXTS; }
        | STRING_T { $$=CHARS; }
        | FLOAT_T { $$=FLOATS; }
        ;

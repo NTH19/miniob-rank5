@@ -301,6 +301,7 @@ void tuple_to_string(std::ostream &os, const Tuple &tuple)
     } else {
       first_field = false;
     }
+
     cell.to_string(os);
   }
 }
@@ -764,7 +765,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     return rc;
   }
 
-
+  Table * thistable = select_stmt->tables()[0];
   std::stringstream ss;
   print_tuple_header(ss, project_oper);
   while ((rc = project_oper.next()) == RC::SUCCESS) {

@@ -48,7 +48,8 @@ typedef enum
   CHARS,
   INTS,
   FLOATS,
-  DATES
+  DATES,
+  TEXTS
 } AttrType;
 typedef enum
 {
@@ -218,6 +219,7 @@ void relation_attr_destroy(RelAttr *relation_attr);
 void value_init_integer(Value *value, int v);
 void value_init_float(Value *value, float v);
 void value_init_string(Value *value, const char *v);
+void value_init_text(Value *value, const char *v);
  int value_init_date(Value *value, const char *v);
 void value_destroy(Value *value);
  int  check_date(int y, int m, int d);

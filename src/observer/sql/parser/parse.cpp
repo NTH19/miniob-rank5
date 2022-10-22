@@ -52,8 +52,16 @@ void value_init_float(Value *value, float v)
   value->data = malloc(sizeof(v));
   memcpy(value->data, &v, sizeof(v));
 }
+void value_init_text(Value *value, const char *v){
+  value->type = TEXTS;
+  value->data = strdup(v);
+}
 void value_init_string(Value *value, const char *v)
 {
+  if(strlen(v) > 4){ //需要考虑最后的\0，不能超过4个字节
+    value_init_text(value,v);
+    return;
+  }
   value->type = CHARS;
   value->data = strdup(v);
 }

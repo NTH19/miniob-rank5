@@ -71,6 +71,7 @@ DOUBLE_QUOTE     [\"]
 [Cc][Hh][Aa][Rr]                                     RETURN_TOKEN(STRING_T);
 [Ff][Ll][Oo][Aa][Tt]                                 RETURN_TOKEN(FLOAT_T);
 [Dd][Aa][Tt][Ee]			            	                 RETURN_TOKEN(DATE_T);
+[Tt][Ee][Xx][Tt]							                       RETURN_TOKEN(TEXT_T);
 [Cc][Oo][Uu][Nn][Tt]                                 RETURN_TOKEN(COUNT_T);
 [Aa][Vv][Gg]                                         RETURN_TOKEN(AVG_T);
 [Ss][Uu][Mm]                                         RETURN_TOKEN(SUM_T);
