@@ -920,7 +920,7 @@ public:
       }
       memcpy(new_record_data, record.data(), record_size);
       memcpy(new_record_data + field_meta_->offset(), value_.data, record_data_size);
-      rc = table_.update_record(trx_, &record, attribute_name_, new_record_data);
+      rc = table_.update_record(trx_, &record, new_record_data);
       
     }
     delete[] new_record_data;
@@ -942,19 +942,31 @@ private:
   std::vector<Record> records_;
 };
 
-RC Table::update_record(Trx *trx, Record *record, const char *attribute_name, const char *new_data) {
+RC Table::update_record(Trx *trx, Record *record, const char *new_data) {
   RC rc = RC::SUCCESS;
-  rc = update_entry_of_indexes(attribute_name, record->data(), &record->rid(), new_data);
+  rc = update_entry_of_indexes(record->data(), &record->rid(), new_data);
   if (rc != RC::SUCCESS) {
-     LOG_ERROR("Failed to update indexes of record (rid=%d.%d). rc=%d:%s",record->rid().page_num, record->rid().slot_num, rc, strrc(rc));
+    LOG_ERROR("Failed to update indexes of record (rid=%d.%d). rc=%d:%s",record->rid().page_num, record->rid().slot_num, rc, strrc(rc));
     return rc;
-  } else {
-    record->data_= (char *)new_data;
-    rc = record_handler_->update_record(record);
   }
+
+  record->data_= const_cast<char *> (new_data);
+  rc = record_handler_->update_record(record);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to update record (rid=%d.%d). rc=%d:%s",
+                record->rid().page_num, record->rid().slot_num, rc, strrc(rc));
+    return rc;
+  }
+
+  if (trx != nullptr) {
+    rc = trx->update_record(this, record);
+    // TODO: CLog
+  }
+
   return rc;
 }
-RC Table::update_entry_of_indexes(const char *attribute_name, const char *record, const RID *rid, const char *new_data) {
+
+RC Table::update_entry_of_indexes(const char *record, const RID *rid, const char *new_data) {
   RC rc = RC::SUCCESS;
   for (Index *index : indexes_) {
     rc = index->update_entry(record, rid, new_data);
@@ -1036,40 +1048,7 @@ RC Table::delete_record(Trx *trx, ConditionFilter *filter, int *deleted_count)
   }
   return rc;
 }
-// RC Table::update_record(Trx *trx, Record *record)
-// {
-//   RC rc = RC::SUCCESS;
-  
-//   rc = update_entry_of_indexes(record->data(), record->rid(), false);  // 重复代码 refer to commit_delete
-//   if (rc != RC::SUCCESS) {
-//     LOG_ERROR("Failed to delete indexes of record (rid=%d.%d). rc=%d:%s",
-//                 record->rid().page_num, record->rid().slot_num, rc, strrc(rc));
-//     return rc;
-//   } 
-  
-//   rc = record_handler_->delete_record(&record->rid());
-//   if (rc != RC::SUCCESS) {
-//     LOG_ERROR("Failed to delete record (rid=%d.%d). rc=%d:%s",
-//                 record->rid().page_num, record->rid().slot_num, rc, strrc(rc));
-//     return rc;
-//   }
 
-//   if (trx != nullptr) {
-//     rc = trx->delete_record(this, record);
-    
-//     CLogRecord *clog_record = nullptr;
-//     rc = clog_manager_->clog_gen_record(CLogType::REDO_DELETE, trx->get_current_id(), clog_record, name(), 0, record);
-//     if (rc != RC::SUCCESS) {
-//       LOG_ERROR("Failed to create a clog record. rc=%d:%s", rc, strrc(rc));
-//       return rc;
-//     }
-//     rc = clog_manager_->clog_append_record(clog_record);
-//     if (rc != RC::SUCCESS) {
-//       return rc;
-//     }
-//   }
-//   return rc;
-// }
 RC Table::delete_record(Trx *trx, Record *record)
 {
   RC rc = RC::SUCCESS;

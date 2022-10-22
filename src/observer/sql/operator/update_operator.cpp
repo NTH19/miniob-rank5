@@ -19,6 +19,9 @@ RC UpdateOperator::open()
   }
 
   Table *table = update_stmt_->table();
+  int record_size = table->table_meta().record_size();
+  char *new_record_data = new char[record_size];
+
   while (RC::SUCCESS == (rc = child->next())) {
     Tuple *tuple = child->current_tuple();
     if (nullptr == tuple) {
@@ -28,17 +31,26 @@ RC UpdateOperator::open()
 
     RowTuple *row_tuple = static_cast<RowTuple *>(tuple);
     Record &record = row_tuple->record();
-    // int c=1;
-    // int * con=&c;
-    int *con = new int(1);
-    
-    rc = table->update_record(nullptr, update_stmt_->attribute(),update_stmt_->values(),(int) update_stmt_->condition_num,update_stmt_->conditions,con);
+
+    const FieldMeta *field_meta = update_stmt_->field();
+    int record_data_size = field_meta->len();
+    if (field_meta->type() == CHARS) {
+      size_t value_len = strlen(static_cast<char *>(update_stmt_->values()->data)) + 1;
+      record_data_size = std::min(record_data_size, static_cast<int>(value_len));
+    }
+
+    memcpy(new_record_data, record.data_, record_size);
+    memset(new_record_data + field_meta->offset(), 0, field_meta->len());
+    memcpy(new_record_data + field_meta->offset(), update_stmt_->values()->data, record_data_size);
+
+    rc = table->update_record(trx_, &record, new_record_data);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to update record: %s", strrc(rc));
+      delete[] new_record_data;
       return rc;
     }
-    delete con;
   }
+  delete[] new_record_data;
   return RC::SUCCESS;
 }
 
