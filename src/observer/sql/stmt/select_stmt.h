@@ -41,11 +41,12 @@ public:
   const std::vector<Field> &query_fields() const { return query_fields_; }
   FilterStmt *filter_stmt() const { return filter_stmt_; }
   const std::vector<std::pair<DescribeFun,Field>> & funs()const {return funs_;}
-
+  int need_reverse;
 private:
   std::vector<Field> query_fields_;
   std::vector<Table *> tables_;
   std::vector<std::pair<DescribeFun,Field>> funs_;
   FilterStmt *filter_stmt_ = nullptr;
+  
 };
 

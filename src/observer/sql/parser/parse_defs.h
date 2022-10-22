@@ -91,6 +91,7 @@ typedef struct {
   size_t condition_num;           // Length of conditions in Where clause
   Condition conditions[MAX_NUM];  // conditions in Where clause
   AggFun aggFun[MAX_NUM];
+  int need_Revere;
 } Selects;
 
 // struct of insert

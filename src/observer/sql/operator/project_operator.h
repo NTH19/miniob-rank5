@@ -25,12 +25,13 @@ public:
 
   virtual ~ProjectOperator() = default;
 
-  void add_projection(const Table *table, const FieldMeta *field);
+  void add_projection(const Table *table, const FieldMeta *field,bool add_table=false);
 
   RC open() override;
   RC next() override;
   RC close() override;
-
+  Tuple* for_mu_tables();
+  Tuple* process_one_tuple(Tuple * t);
   int tuple_cell_num() const
   {
     return tuple_.cell_num();

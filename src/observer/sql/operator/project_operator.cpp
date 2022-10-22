@@ -44,18 +44,25 @@ RC ProjectOperator::close()
   children_[0]->close();
   return RC::SUCCESS;
 }
+Tuple* ProjectOperator::for_mu_tables(){
+  return &tuple_;
+}
 Tuple *ProjectOperator::current_tuple()
 {
   tuple_.set_tuple(children_[0]->current_tuple());
   return &tuple_;
 }
-
-void ProjectOperator::add_projection(const Table *table, const FieldMeta *field_meta)
+Tuple* ProjectOperator::process_one_tuple(Tuple * t){
+  tuple_.set_tuple(t);
+  return &tuple_;
+}
+void ProjectOperator::add_projection(const Table *table, const FieldMeta *field_meta,bool add_table)
 {
   // 对单表来说，展示的(alias) 字段总是字段名称，
   // 对多表查询来说，展示的alias 需要带表名字
   TupleCellSpec *spec = new TupleCellSpec(new FieldExpr(table, field_meta));
-  spec->set_alias(field_meta->name());
+  if(!add_table)spec->set_alias(field_meta->name());
+  else spec->set_alias((new std::string(table->name()))->append(".").append(field_meta->name()).c_str());
   tuple_.add_cell_spec(spec);
 }
 
