@@ -45,6 +45,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/default/default_handler.h"
 #include "storage/common/condition_filter.h"
 #include "storage/trx/trx.h"
+#include <algorithm>
 #include "storage/clog/clog.h"
 
 using namespace common;
@@ -515,15 +516,16 @@ void init_ret_aggfun(
 void p_mutiple_table_header(std::ostream &os, std::vector<ProjectOperator> &p)
 {
   int j = 0;
-  for (auto &oper : p) {
-    const int cell_num = oper.tuple_cell_num();
+  int n=p.size();
+  for (int k=n-1;k>=0;--k) {
+    const int cell_num = p[k].tuple_cell_num();
     const TupleCellSpec *cell_spec = nullptr;
     if (j) {
       os << " | ";
     }
     j++;
     for (int i = 0; i < cell_num; i++) {
-      oper.tuple_cell_spec_at(i, cell_spec);
+      p[k].tuple_cell_spec_at(i, cell_spec);
       if (i != 0) {
         os << " | ";
       }
@@ -533,6 +535,68 @@ void p_mutiple_table_header(std::ostream &os, std::vector<ProjectOperator> &p)
     }
   }
   os << "\n";
+}
+void dfs(std::vector<Table*>&tables,int step,const std::vector<Field>query_fields,
+RowTuple* lastTuple,std::string lastRes,std::ostream &os,std::map<std::pair<std::string,std::string>,std::tuple<FieldExpr*,FieldExpr*,CompOp>>&mtoF,
+std::map<std::string,ProjectOperator*>&tableToProject,FilterStmt* filter,bool needJoin,std::string lastTablename){
+  auto scan_oper = new TableScanOperator(tables[step]);
+  auto pred_oper=new PredicateOperator (filter);
+  pred_oper->add_child(scan_oper);
+  pred_oper->open();
+  std::string nowTablename(tables[step]->name());
+  while ( pred_oper->next() == RC::SUCCESS) {
+    RowTuple *tuple = dynamic_cast<RowTuple *>(pred_oper->current_tuple());
+    if (nullptr == tuple) {
+      LOG_ERROR("DFS empty\n!!!!!");
+      break;
+    }
+      bool canAdd=false;
+    if(needJoin){
+      if(mtoF.count(std::pair<std::string,std::string>(lastTablename,nowTablename))){
+        auto [l,r,cmp]= mtoF[std::pair<std::string,std::string>(lastTablename,nowTablename)];
+        TupleCell left_cell;
+        TupleCell right_cell;
+        if(l->get_value(*lastTuple, left_cell)==RC::NOTFOUND)continue;
+        if(r->get_value(*tuple, right_cell)==RC::NOTFOUND)continue;
+        const int compare = left_cell.compare(right_cell);
+        bool filter_result;
+        switch (cmp) {
+          case EQUAL_TO: {
+            filter_result = (0 == compare); 
+          } break;
+          case LESS_EQUAL: {
+            filter_result = (compare <= 0); 
+          } break;
+          case NOT_EQUAL: {
+            filter_result = (compare != 0);
+          } break;
+          case LESS_THAN: {
+            filter_result = (compare < 0);
+          } break;
+          case GREAT_EQUAL: {
+          filter_result = (compare >= 0);
+          } break;
+          case GREAT_THAN: {
+            filter_result = (compare > 0);
+          } break;
+        }
+        canAdd=filter_result;
+      }else canAdd=true;
+    }else canAdd=true;
+    if(canAdd){
+      auto p2=dynamic_cast<ProjectTuple *>(tableToProject[nowTablename]->for_mu_tables());
+      p2->set_tuple(tuple);
+      std::stringstream kl; 
+      tuple_to_string(kl, *p2);
+      std::string temp(kl.str());
+      auto x=temp.data();
+      if(step!=tables.size()-1)dfs(tables,step+1,query_fields,tuple,lastRes+(step==0?"":" | ")+temp,os,mtoF,tableToProject,filter,needJoin,nowTablename);
+      else os<<lastRes+(step==0?"":" | ")+temp<<"\n";
+    }
+  }
+  pred_oper->close();
+  delete pred_oper;
+  delete scan_oper;
 }
 RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 {
@@ -545,12 +609,15 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     auto cons = select_stmt->filter_stmt()->filter_units();
     FieldExpr *left_attr;
     FieldExpr *right_attr;
+    std::map<std::pair<std::string,std::string>,std::tuple<FieldExpr*,FieldExpr*,CompOp>>mtoF;
     bool need_join = false;
     for (int i = 0; i < cons.size(); ++i) {
-      if (dynamic_cast<FieldExpr *>(cons[0]->left()) != 0 && dynamic_cast<FieldExpr *>(cons[0]->right()) != 0) {
-        left_attr = dynamic_cast<FieldExpr *>(cons[0]->left());
-        right_attr = dynamic_cast<FieldExpr *>(cons[0]->right());
+      if (dynamic_cast<FieldExpr *>(cons[i]->left()) != 0 && dynamic_cast<FieldExpr *>(cons[i]->right()) != 0) {
+        left_attr = dynamic_cast<FieldExpr *>(cons[i]->left());
+        right_attr = dynamic_cast<FieldExpr *>(cons[i]->right());
         need_join = true;
+        mtoF[std::pair<std::string,std::string>(left_attr->table_name(),right_attr->table_name())]=std::tuple<FieldExpr*,FieldExpr*,CompOp>(left_attr,right_attr,cons[i]->comp());
+        //mtoF[std::pair<std::string,std::string>(left_attr->table_name(),right_attr->table_name())]=std::pair<FieldExpr*,FieldExpr*>(left_attr,right_attr);
       }
     }
 
@@ -566,7 +633,6 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     for (int i = 0, j = 0; i < query_fields.size(); ++i) {
       if (i && query_fields[i].table_name() != query_fields[i - 1].table_name()) {
         j++;
-        // project_oper.push_back(ProjectOperator());
       }
       accuse=j;
       project_oper[j].add_projection(query_fields[i].table(), query_fields[i].meta(), true);
@@ -574,90 +640,8 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     }
     project_oper.resize(accuse+1);
     p_mutiple_table_header(ss, project_oper);
-    if (!need_join) {
-      int n=tables.size();
-      for(int i=0;i<n;++i){
-        auto scan_oper = new TableScanOperator(tables[i]);
-        auto pred_oper=new PredicateOperator (select_stmt->filter_stmt());
-        pred_oper->add_child(scan_oper);
-        m[std::string(tables[i]->name())]->add_child(pred_oper);
-        m[std::string(tables[i]->name())]->open();
-      }
-      std::vector<bool>p_space(accuse,false);
-      while(true){
-        bool has=false;
-        for(int i =0;i<n;++i){
-          if((rc = project_oper[i].next()) == RC::SUCCESS){
-            has=true;
-            p_space[i]=true;
-          }
-        }
-        if(!has)break;
-        bool is_first=true;
-        for(int i=0;i<n;++i){
-          Tuple *tuple = project_oper[i].current_tuple();
-          if(is_first){
-            is_first=false;
-          }else ss<<" | ";
-          if (nullptr == tuple) {
-            rc = RC::INTERNAL;
-            LOG_WARN("failed to get current record. rc=%s", strrc(rc));
-            break;
-          }
-          if(p_space[i]){
-            tuple_to_string(ss, *tuple);
-            p_space[i]=false;
-          }else ss<<" ";
-        }
-        ss << std::endl;
-      }
-      session_event->set_response(ss.str());
-      return RC::SUCCESS;
-    }
-    if (std::string(query_fields[0].table_name()) != std::string(tables[0]->name()))
-      std::swap(tables[0], tables[1]);
-    Operator *scan_oper = new TableScanOperator(tables[0]);
-    DEFER([&]() { delete scan_oper; });
-    PredicateOperator pred_oper(select_stmt->filter_stmt());
-    pred_oper.add_child(scan_oper);
-    rc = pred_oper.open();
-    
-    
-    while ((rc = pred_oper.next()) == RC::SUCCESS) {
-      RowTuple *tuple1 = dynamic_cast<RowTuple *>(pred_oper.current_tuple());
-
-      if (nullptr == tuple1) {
-        rc = RC::INTERNAL;
-        LOG_WARN("failed to get current record. rc=%s", strrc(rc));
-        break;
-      }
-
-      Operator *scan_oper2 = new TableScanOperator(tables[1]);
-      DEFER([&]() { delete scan_oper2; });
-      PredicateOperator pred_oper2(select_stmt->filter_stmt());
-      pred_oper2.add_child(scan_oper2);
-      pred_oper2.open();
-      while ((rc = pred_oper2.next()) == RC::SUCCESS) {
-        RowTuple *tuple2 = dynamic_cast<RowTuple *>(pred_oper2.current_tuple());
-        if (nullptr == tuple2) {
-          rc = RC::INTERNAL;
-          LOG_WARN("failed to get current record. rc=%s", strrc(rc));
-          break;
-        }
-        if (memcmp(tuple1->record().data() + left_attr->field().meta()->offset(),
-                tuple2->record().data() + left_attr->field().meta()->offset(),
-                4) == 0) {
-          auto p1 = dynamic_cast<ProjectTuple *>(project_oper[0].for_mu_tables());
-          auto p2 = dynamic_cast<ProjectTuple *>(project_oper[1].for_mu_tables());
-          p1->set_tuple(tuple1);
-          p2->set_tuple(tuple2);
-          tuple_to_string(ss, *p1);
-          ss << " | ";
-          tuple_to_string(ss, *p2);
-          ss << "\n";
-        }
-      }
-    }
+    std::reverse(tables.begin(),tables.end());
+    dfs(tables,0,query_fields,nullptr,"",ss,mtoF,m,select_stmt->filter_stmt(),need_join,"0dummy");
     session_event->set_response(ss.str());
     return rc;
   }
