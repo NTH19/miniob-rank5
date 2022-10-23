@@ -126,6 +126,14 @@ private:
 public:
   Index *find_index(const char *index_name) const;
   Index *find_index_by_field(const char *field_name) const;
+  int insert_text(char *s) {
+    texts.push_back(s);
+    text_num ++;
+    return text_num - 1;
+  }
+  char *get_text(int index) const{
+    return texts[index];
+  }
 
 private:
   std::string base_dir_;
@@ -134,6 +142,8 @@ private:
   DiskBufferPool *data_buffer_pool_ = nullptr;   /// 数据文件关联的buffer pool
   RecordFileHandler *record_handler_ = nullptr;  /// 记录操作
   std::vector<Index *> indexes_;
+  int                     text_num;
+  std::vector<char*>      texts;
 };
 
 #endif  // __OBSERVER_STORAGE_COMMON_TABLE_H__

@@ -20,7 +20,7 @@ See the Mulan PSL v2 for more details. */
 #include "util/comparator.h"
 #include "util/util.h"
 
-void TupleCell::to_string(std::ostream &os) const
+void TupleCell::to_string(std::ostream &os) const//only text need thistable
 {
   switch (attr_type_) {
   case INTS: {
@@ -41,6 +41,9 @@ void TupleCell::to_string(std::ostream &os) const
   case DATES:{
     std::string s=std::to_string(*(int*)data_);
     os<<s.substr(0,4)<<"-"<<s.substr(4,2)<<"-"<<s.substr(6,2);
+  }break;
+  case TEXTS:{
+    os<<(char*)data_;
   }break;
   default: {
     LOG_WARN("unsupported attr type: %d", attr_type_);

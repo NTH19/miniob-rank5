@@ -114,7 +114,13 @@ public:
     FieldExpr *field_expr = (FieldExpr *)spec->expression();
     const FieldMeta *field_meta = field_expr->field().meta();
     cell.set_type(field_meta->type());
-    cell.set_data(this->record_->data() + field_meta->offset());
+    if (field_meta->type()==TEXTS){
+     cell.set_data(table_->get_text(*(int*)(this->record_->data() + field_meta->offset())));
+    }
+    else{
+      cell.set_data(this->record_->data() + field_meta->offset());
+    }
+    
     cell.set_length(field_meta->len());
     return RC::SUCCESS;
   }
@@ -227,4 +233,5 @@ public:
 private:
   std::vector<TupleCellSpec *> speces_;
   Tuple *tuple_ = nullptr;
+  const Table *table_ = nullptr;
 };
