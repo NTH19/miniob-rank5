@@ -8,8 +8,8 @@ class UpdateStmt;
 class UpdateOperator : public Operator
 {
 public:
-  UpdateOperator(UpdateStmt *delete_stmt)
-    : update_stmt_(delete_stmt)
+  UpdateOperator(UpdateStmt *delete_stmt, Trx *trx)
+    : update_stmt_(delete_stmt), trx_(trx)
   {}
 
   virtual ~UpdateOperator() = default;
@@ -27,4 +27,5 @@ public:
   //RC tuple_cell_spec_at(int index, TupleCellSpec &spec) const override
 private:
   UpdateStmt *update_stmt_ = nullptr;
+  Trx *trx_ = nullptr;
 };
