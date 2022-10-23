@@ -20,7 +20,7 @@ BplusTreeIndex::~BplusTreeIndex() noexcept
   close();
 }
 
-RC BplusTreeIndex::create(const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta)
+RC BplusTreeIndex::create(const char *file_name, const IndexMeta &index_meta, const std::vector<const FieldMeta *> &field_meta)
 {
   if (inited_) {
     LOG_WARN("Failed to create index due to the index has been created before. file_name:%s, index:%s, field:%s",
@@ -32,7 +32,7 @@ RC BplusTreeIndex::create(const char *file_name, const IndexMeta &index_meta, co
 
   Index::init(index_meta, field_meta);
 
-  RC rc = index_handler_.create(file_name, field_meta.type(), field_meta.len());
+  RC rc = index_handler_.create(file_name, field_meta);
   if (RC::SUCCESS != rc) {
     LOG_WARN("Failed to create index_handler, file_name:%s, index:%s, field:%s, rc:%s",
         file_name,
@@ -60,7 +60,7 @@ RC BplusTreeIndex::drop()
   inited_ = false;
   return RC::SUCCESS;
 }
-RC BplusTreeIndex::open(const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta)
+RC BplusTreeIndex::open(const char *file_name, const IndexMeta &index_meta, const std::vector<const FieldMeta *> &field_meta)
 {
   if (inited_) {
     LOG_WARN("Failed to open index due to the index has been initedd before. file_name:%s, index:%s, field:%s",
@@ -100,17 +100,52 @@ RC BplusTreeIndex::close()
   return RC::SUCCESS;
 }
 
+/* return value should be delete after use */
+char *BplusTreeIndex::make_userkey(const char *record) const {
+  char *user_key = new char[index_handler_.attr_length()];
+  int offset = 0;
+  for(const FieldMeta &field : field_meta_) {
+    memcpy(user_key + offset, record + field.offset(), field.len());
+    offset += field.len();
+  }
+  return user_key;
+}
+
 RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
 {
-  return index_handler_.insert_entry(record + field_meta_.offset(), rid);
+  char *user_key = make_userkey(record);
+  RC rc = index_handler_.insert_entry(user_key, rid);
+  delete[] user_key;
+  return rc;
 }
 
 RC BplusTreeIndex::delete_entry(const char *record, const RID *rid)
 {
-  return index_handler_.delete_entry(record + field_meta_.offset(), rid);
+  char *user_key = make_userkey(record);
+  RC rc = index_handler_.delete_entry(user_key, rid);
+  delete[] user_key;
+  return rc;
 }
 RC BplusTreeIndex::update_entry(const char *record, const RID *rid, const char *new_data) {
-  return index_handler_.update_entry(record + field_meta_.offset(), rid, new_data + field_meta_.offset());
+  char *old_key = make_userkey(record);
+  char *new_key = make_userkey(new_data);
+  RC rc = index_handler_.delete_entry(old_key, rid);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to update entry when deleting old entry.");
+    delete[] old_key;
+    delete[] new_key;
+    return rc;    
+  }
+  rc = index_handler_.insert_entry(new_key, rid);
+  if (rc != RC::SUCCESS) {
+    RC rc2 = index_handler_.insert_entry(old_key, rid);
+    if (rc2 != RC::SUCCESS) {
+      LOG_ERROR("Failed to reinsert old entry");
+    }
+  }
+  delete[] old_key;
+  delete[] new_key;
+  return rc;
 }
 IndexScanner *BplusTreeIndex::create_scanner(const char *left_key, int left_len, bool left_inclusive,
 					     const char *right_key, int right_len, bool right_inclusive)
