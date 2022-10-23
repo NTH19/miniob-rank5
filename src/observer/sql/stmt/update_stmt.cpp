@@ -53,7 +53,8 @@ RC UpdateStmt::create(Db *db, const Updates &update, Stmt *&stmt)
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-  if (field->type() != update.value.type) {
+  // CHAR and TEXT is same
+  if (field->type() != update.value.type && (field->type() != TEXTS || update.value.type != CHARS)) {
     LOG_WARN("field type not match. field=%s.%s.%s", db->name(), table->name(), update.attribute_name);
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }

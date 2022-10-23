@@ -41,7 +41,7 @@ RC UpdateOperator::open()
       record_data_size = std::min(record_data_size, static_cast<int>(value_len));
       memset(new_record_data + field_meta->offset(), 0, field_meta->len());
       memcpy(new_record_data + field_meta->offset(), value_data, record_data_size);
-    } else if (field_meta->type() == CHARS) {
+    } else if (field_meta->type() == TEXTS) {
       char *s;
       if (strlen(value_data) > 4096) {
         s = (char*)malloc(4097);

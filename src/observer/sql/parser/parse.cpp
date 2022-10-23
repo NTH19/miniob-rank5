@@ -52,19 +52,13 @@ void value_init_float(Value *value, float v)
   value->data = malloc(sizeof(v));
   memcpy(value->data, &v, sizeof(v));
 }
-void value_init_text(Value *value, const char *v){
-  value->type = TEXTS;
-  value->data = strdup(v);
-}
+
 void value_init_string(Value *value, const char *v)
 {
-  if(strlen(v) > 4){ //需要考虑最后的\0，不能超过4个字节
-    value_init_text(value,v);
-    return;
-  }
   value->type = CHARS;
   value->data = strdup(v);
 }
+
 int value_init_date(Value* value, const char* v) {
     value->type = DATES;
     int y,m,d;
@@ -319,7 +313,7 @@ void create_index_destroy(CreateIndex *create_index)
 {
   free(create_index->index_name);
   free(create_index->relation_name);
-  for(int i = 0; i < create_index->attribute_count; ++ i) {
+  for(size_t i = 0; i < create_index->attribute_count; ++ i) {
     free(create_index->attribute_name[i]);
   }
 

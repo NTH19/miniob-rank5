@@ -40,43 +40,30 @@ RC InsertStmt::create(Db *db, const Inserts &inserts, Stmt *&stmt)
     LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
-  const int value_num = inserts.value_num/inserts.record_num;
+
+  const int value_num = inserts.value_num / inserts.record_num;
   const TableMeta &table_meta = table->table_meta();
   const int field_num = table_meta.field_num() - table_meta.sys_field_num();
   if (field_num != value_num) {
     LOG_WARN("schema mismatch. value num=%d, field num in schema=%d", value_num, field_num);
     return RC::SCHEMA_FIELD_MISSING;
-    }
+  }
   // check the fields number
-    const int sys_field_num = table_meta.sys_field_num();
-     Inserts *insert_sql= new Inserts();
-     memcpy( insert_sql->record_length ,inserts.record_length,sizeof(size_t)*MAX_DATA);
-     insert_sql->record_num=inserts.record_num;
-     insert_sql->value_num=inserts.value_num;
-     insert_sql->relation_name=inserts.relation_name;
-     memcpy(insert_sql->values,inserts.values,sizeof(Value)*MAX_DATA*MAX_NUM);
-
-
-
-  for (size_t j = 0; j< insert_sql->record_num; j++)
-  {
-       Value *rvalues = insert_sql->values[j];
-  // check fields type
-  for (int i = 0; i < value_num; i++) {
-    const FieldMeta *field_meta = table_meta.field(i + sys_field_num);
-    const AttrType field_type = field_meta->type();
-    const AttrType value_type = rvalues[i].type;
-    if (field_type != value_type && value_type == UNDEFINED) { 
-      LOG_WARN("field type mismatch. table=%s, field=%s, field type=%d, value_type=%d", 
-               table_name, field_meta->name(), field_type, value_type);
-      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
-       }
-    else if (field_type != value_type && !(CHARS == field_type && TEXTS == value_type)){
-      rvalues[i].type=CHARS;
-    }
+  const int sys_field_num = table_meta.sys_field_num();
+  for (size_t j = 0; j < inserts.record_num; j++) {
+    const Value *rvalues = inserts.values[j];
+    for (int i = 0; i < value_num; i++) {
+      const FieldMeta *field_meta = table_meta.field(i + sys_field_num);
+      const AttrType field_type = field_meta->type();
+      const AttrType value_type = rvalues[i].type;
+      if (inserts.record_num > 1 && field_type != value_type && !(TEXTS == field_type && CHARS == value_type)) { 
+        LOG_WARN("field type mismatch. table=%s, field=%s, field type=%d, value_type=%d", 
+                table_name, field_meta->name(), field_type, value_type);
+        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
+    }
   }
   // everything alright
-  stmt = new InsertStmt(table,value_num,inserts.record_num, *insert_sql);
+  stmt = new InsertStmt(table,value_num,inserts.record_num, inserts);
   return RC::SUCCESS;
 }
