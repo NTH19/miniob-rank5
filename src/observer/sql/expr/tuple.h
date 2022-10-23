@@ -114,10 +114,9 @@ public:
     FieldExpr *field_expr = (FieldExpr *)spec->expression();
     const FieldMeta *field_meta = field_expr->field().meta();
     cell.set_type(field_meta->type());
-    if (field_meta->type()==TEXTS){
-     cell.set_data(table_->get_text(*(int*)(this->record_->data() + field_meta->offset())));
-    }
-    else{
+    if (field_meta->type() == TEXTS){
+      cell.set_data(table_->get_text(*(int*)(this->record_->data() + field_meta->offset())));
+    } else{
       cell.set_data(this->record_->data() + field_meta->offset());
     }
     

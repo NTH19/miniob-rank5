@@ -410,24 +410,24 @@ RC Table::insert_records(Trx *trx, int record_num,int value_num, const Value val
     return RC::INVALID_ARGUMENT;
   }
   RC rc;
-  value_num=value_num/record_num;
+  value_num = value_num / record_num;
   const int normal_field_start_index = table_meta_.sys_field_num();
-  for(size_t jk=0;jk<record_num;jk++){//check filed
+  for(size_t jk = 0; jk < record_num; jk ++){ // check filed
     const Value * valuesc=values[jk];
-  for (int i = 0; i < value_num; i++) {
-    const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
-    const Value &value = valuesc[i];
-    if (record_num == 1) {
-      if (field->type() != value.type && value.type == UNDEFINED) {
+    for (int i = 0; i < value_num; i++) {
+      const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
+      const Value &value = valuesc[i];
+      if (value.type == UNDEFINED) {
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
-    } else {
-      if (field->type() != value.type || value.type == UNDEFINED) {
-        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+      // multiple update should check type
+      if (record_num > 1) { 
+        if (field->type() != value.type && !(TEXTS == field->type() && CHARS == value.type)) {
+          return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+        }
       }
     }
   }
-}
   for(int i = 0;i < record_num;i++){
     char *record_data;
     rc = make_record(value_num, values[i], record_data);
@@ -541,11 +541,6 @@ RC Table::cast_to_float(const FieldMeta &field, const Value &src_value, char *re
   return RC::SUCCESS;
 }
 
-//   CHARS,
-//   INTS,
-//   FLOATS,
-//   DATES
-
 RC Table::make_record(int value_num, const Value *values, char *&record_out)
 {
   // 检查字段类型是否一致
@@ -564,50 +559,33 @@ RC Table::make_record(int value_num, const Value *values, char *&record_out)
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value &value = values[i];
-    switch (field->type())
-    {
-    case CHARS:{
-      if ( TEXTS==value.type) {
-        Value *nvalue =new Value();
-        nvalue->type=CHARS;
-        nvalue->data=value.data;
-        rc = cast_to_char(*field, *nvalue, record);
-      }
-      else rc = cast_to_char(*field, value, record);
-      }
+    switch (field->type()) {
+    case CHARS:
+      rc = cast_to_char(*field, value, record);
       break;
-    case INTS:{
-    if ( TEXTS==value.type) {
-        Value *nvalue =new Value();
-        nvalue->type=CHARS;
-        nvalue->data=value.data;
-        rc = cast_to_int(*field, *nvalue, record);
-      }
-      else rc = cast_to_int(*field, value, record);}
+    case INTS:
+      rc = cast_to_int(*field, value, record);
       break;
-    case FLOATS:{
-    if ( TEXTS==value.type) {
-        Value *nvalue =new Value();
-        nvalue->type=CHARS;
-        nvalue->data=value.data;
-        rc = cast_to_float(*field, *nvalue, record);
-      }
-      else rc = cast_to_float(*field, value, record);}
+    case FLOATS:
+      rc = cast_to_float(*field, value, record);
       break;
     case DATES:
       memcpy(record + field->offset(), value.data, field->len());
       break;
-    case TEXTS:{
+    case TEXTS: {
       char *s = (char*)(value.data);
       size_t len = strlen(s);
       if (len > 4096) {
-        s = (char*)malloc(sizeof(char) * 4097);
+        s = (char*)malloc(4097);
         s[4096] = 0;
-      } else s=(char*)malloc(len);
-      memcpy(s, value.data, len>4096?4096:len+1);
+      } else {
+        s = (char*)malloc(len);
+      }
+      memcpy(s, value.data, len > 4096 ? 4096 : len + 1);
       int result = insert_text(s);
       memcpy(record + field->offset(), &result, field->len());
-    }break;
+      break;
+    }
     default:
       rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
       break;
