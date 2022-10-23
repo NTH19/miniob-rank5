@@ -42,7 +42,6 @@ public:
 
 private:
   Table *table_ = nullptr;
-
   int value_amount_ = 0;
   int record_num_=0;
 };

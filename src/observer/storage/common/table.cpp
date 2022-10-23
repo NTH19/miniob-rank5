@@ -557,14 +557,33 @@ RC Table::make_record(int value_num, const Value *values, char *&record_out)
     const Value &value = values[i];
     switch (field->type())
     {
-    case CHARS:
-      rc = cast_to_char(*field, value, record);
+    case CHARS:{
+      if ( TEXTS==value.type) {
+        Value *nvalue =new Value();
+        nvalue->type=CHARS;
+        nvalue->data=value.data;
+        rc = cast_to_char(*field, *nvalue, record);
+      }
+      else rc = cast_to_char(*field, value, record);
+      }
       break;
-    case INTS:
-      rc = cast_to_int(*field, value, record);
+    case INTS:{
+    if ( TEXTS==value.type) {
+        Value *nvalue =new Value();
+        nvalue->type=CHARS;
+        nvalue->data=value.data;
+        rc = cast_to_int(*field, *nvalue, record);
+      }
+      else rc = cast_to_int(*field, value, record);}
       break;
-    case FLOATS:
-      rc = cast_to_float(*field, value, record);
+    case FLOATS:{
+    if ( TEXTS==value.type) {
+        Value *nvalue =new Value();
+        nvalue->type=CHARS;
+        nvalue->data=value.data;
+        rc = cast_to_float(*field, *nvalue, record);
+      }
+      else rc = cast_to_float(*field, value, record);}
       break;
     case DATES:
       memcpy(record + field->offset(), value.data, field->len());

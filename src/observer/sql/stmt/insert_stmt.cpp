@@ -49,9 +49,18 @@ RC InsertStmt::create(Db *db, const Inserts &inserts, Stmt *&stmt)
     }
   // check the fields number
     const int sys_field_num = table_meta.sys_field_num();
-  for (size_t j = 0; j< inserts.record_num; j++)
+     Inserts *insert_sql= new Inserts();
+     memcpy( insert_sql->record_length ,inserts.record_length,sizeof(size_t)*MAX_DATA);
+     insert_sql->record_num=inserts.record_num;
+     insert_sql->value_num=inserts.value_num;
+     insert_sql->relation_name=inserts.relation_name;
+     memcpy(insert_sql->values,inserts.values,sizeof(Value)*MAX_DATA*MAX_NUM);
+
+
+
+  for (size_t j = 0; j< insert_sql->record_num; j++)
   {
-      const Value *rvalues = inserts.values[j];
+       Value *rvalues = insert_sql->values[j];
   // check fields type
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field_meta = table_meta.field(i + sys_field_num);
@@ -62,9 +71,12 @@ RC InsertStmt::create(Db *db, const Inserts &inserts, Stmt *&stmt)
                table_name, field_meta->name(), field_type, value_type);
       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
        }
+    else if (field_type != value_type && !(CHARS == field_type && TEXTS == value_type)){
+      rvalues[i].type=CHARS;
+    }
       }
   }
   // everything alright
-  stmt = new InsertStmt(table,value_num,inserts.record_num, inserts);
+  stmt = new InsertStmt(table,value_num,inserts.record_num, *insert_sql);
   return RC::SUCCESS;
 }
