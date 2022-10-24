@@ -93,6 +93,7 @@ typedef struct {
   Condition conditions[MAX_NUM];  // conditions in Where clause
   AggFun aggFun[MAX_NUM];
   int need_Revere;
+  int need_reverse_join;
 } Selects;
 
 // struct of insert

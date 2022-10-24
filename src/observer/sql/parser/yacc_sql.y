@@ -104,6 +104,8 @@ ParserContext *get_context(yyscan_t scanner)
         AND
         SET
         ON
+		INNER_T
+		JOIN_T
         LOAD
         DATA
         INFILE
@@ -411,7 +413,29 @@ select:				/*  select 语句的语法解析树*/
 		CONTEXT->select_length=0;
 		CONTEXT->value_length = 0;
 	}
+	|SELECT select_attr FROM ID INNER_T JOIN_T ID ON join_cons join_list where SEMICOLON{
+			selects_append_relation(&CONTEXT->ssql->sstr.selection, $7);
+			selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
+			selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
+			CONTEXT->ssql->flag=SCF_SELECT;//"select";
+			// CONTEXT->ssql->sstr.selection.attr_num = CONTEXT->select_length;
+			//临时变量清零
+			CONTEXT->condition_length=0;
+			CONTEXT->from_length=0;
+			CONTEXT->select_length=0;
+			CONTEXT->value_length = 0;
+		}
 	;
+join_list:
+	 /* empty */
+    | INNER_T JOIN_T ID ON join_cons join_list {	
+		selects_append_relation(&CONTEXT->ssql->sstr.selection, $3);
+	}
+    ;
+join_cons:
+	 condition condition_list {	
+	}
+    ;
 agg_fun_list_head:
 	 COUNT_T LBRACE STAR RBRACE agg_fun_list{
 		AggFun aggre;
@@ -649,43 +673,24 @@ condition:
     }
     |value comOp ID DOT ID
 		{
-			Value *left_value = &CONTEXT->values[CONTEXT->value_length - 1];
-
-			RelAttr right_attr;
-			relation_attr_init(&right_attr, $3, $5);
-
-			Condition condition;
-			condition_init(&condition, CONTEXT->comp, 0, NULL, left_value, 1, &right_attr, NULL);
-			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
-			// $$=( Condition *)malloc(sizeof( Condition));
-			// $$->left_is_attr = 0;//属性值
-			// $$->left_attr.relation_name=NULL;
-			// $$->left_attr.attribute_name=NULL;
-			// $$->left_value = *$1;
-			// $$->comp =CONTEXT->comp;
-			// $$->right_is_attr = 1;//属性
-			// $$->right_attr.relation_name = $3;
-			// $$->right_attr.attribute_name = $5;
+		Value *left_value = &CONTEXT->values[CONTEXT->value_length - 1];
+		RelAttr right_attr;
+		relation_attr_init(&right_attr, $3, $5);
+		Condition condition;
+		condition_init(&condition, CONTEXT->comp, 0, NULL, left_value, 1, &right_attr, NULL);
+		CONTEXT->conditions[CONTEXT->condition_length++] = condition;
 									
     }
     |ID DOT ID comOp ID DOT ID
-		{
-			RelAttr left_attr;
-			relation_attr_init(&left_attr, $1, $3);
-			RelAttr right_attr;
-			relation_attr_init(&right_attr, $5, $7);
-
-			Condition condition;
-			condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
-			CONTEXT->conditions[CONTEXT->condition_length++] = condition;
-			// $$=( Condition *)malloc(sizeof( Condition));
-			// $$->left_is_attr = 1;		//属性
-			// $$->left_attr.relation_name=$1;
-			// $$->left_attr.attribute_name=$3;
-			// $$->comp =CONTEXT->comp;
-			// $$->right_is_attr = 1;		//属性
-			// $$->right_attr.relation_name=$5;
-			// $$->right_attr.attribute_name=$7;
+	{
+			
+		RelAttr left_attr;
+		relation_attr_init(&left_attr, $1, $3);
+		RelAttr right_attr;
+		relation_attr_init(&right_attr, $5, $7);
+		Condition condition;
+		condition_init(&condition, CONTEXT->comp, 1, &left_attr, NULL, 1, &right_attr, NULL);
+		CONTEXT->conditions[CONTEXT->condition_length++] = condition;
     }
     ;
 
