@@ -901,7 +901,9 @@ public:
         value_.type = FLOATS;
         return RC::SUCCESS;
       }
+      
       return RC::MISMATCH;
+
     }
     attr_data_size_ = field_meta_->len();
     return RC::SUCCESS;
