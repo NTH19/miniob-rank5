@@ -52,19 +52,13 @@ void value_init_float(Value *value, float v)
   value->data = malloc(sizeof(v));
   memcpy(value->data, &v, sizeof(v));
 }
-void value_init_text(Value *value, const char *v){
-  value->type = TEXTS;
-  value->data = strdup(v);
-}
+
 void value_init_string(Value *value, const char *v)
 {
-  if(strlen(v) > 4){ //需要考虑最后的\0，不能超过4个字节
-    value_init_text(value,v);
-    return;
-  }
   value->type = CHARS;
   value->data = strdup(v);
 }
+
 int value_init_date(Value* value, const char* v) {
     value->type = DATES;
     int y,m,d;
@@ -304,22 +298,28 @@ void drop_table_destroy(DropTable *drop_table)
 }
 
 void create_index_init(
-    CreateIndex *create_index, const char *index_name, const char *relation_name, const char *attr_name)
+    CreateIndex *create_index, const char *index_name, const char *relation_name)
 {
   create_index->index_name = strdup(index_name);
   create_index->relation_name = strdup(relation_name);
-  create_index->attribute_name = strdup(attr_name);
+}
+
+void create_index_append_attribute(CreateIndex *create_index, const char *attr_name)
+{
+  create_index->attribute_name[create_index->attribute_count++] = strdup(attr_name);
 }
 
 void create_index_destroy(CreateIndex *create_index)
 {
   free(create_index->index_name);
   free(create_index->relation_name);
-  free(create_index->attribute_name);
+  for(size_t i = 0; i < create_index->attribute_count; ++ i) {
+    free(create_index->attribute_name[i]);
+  }
 
   create_index->index_name = nullptr;
   create_index->relation_name = nullptr;
-  create_index->attribute_name = nullptr;
+  create_index->attribute_count = 0;
 }
 
 void drop_index_init(DropIndex *drop_index, const char *index_name)

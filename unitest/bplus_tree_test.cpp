@@ -325,12 +325,13 @@ TEST(test_bplus_tree, test_leaf_index_node_handle)
   index_file_header.leaf_max_size = 5;
   index_file_header.attr_length = 4;
   index_file_header.key_length = 4 + sizeof(RID);
-  index_file_header.attr_type = INTS;
+  index_file_header.attr_types[0] = INTS;
+  index_file_header.attr_lengths[0] = 4;
 
   Frame frame;
 
   KeyComparator key_comparator;
-  key_comparator.init(INTS, 4);
+  key_comparator.init(index_file_header.attr_types, index_file_header.attr_lengths, 1);
 
   LeafIndexNodeHandler leaf_node(index_file_header, &frame);
   leaf_node.init_empty();
@@ -384,12 +385,13 @@ TEST(test_bplus_tree, test_internal_index_node_handle)
   index_file_header.leaf_max_size = 5;
   index_file_header.attr_length = 4;
   index_file_header.key_length = 4 + sizeof(RID);
-  index_file_header.attr_type = INTS;
+  index_file_header.attr_types[0] = INTS;
+  index_file_header.attr_lengths[0] = 4;
 
   Frame frame;
 
   KeyComparator key_comparator;
-  key_comparator.init(INTS, 4);
+  key_comparator.init(index_file_header.attr_types, index_file_header.attr_lengths, 1);
 
   InternalIndexNodeHandler internal_node(index_file_header, &frame);
   internal_node.init_empty();
@@ -479,7 +481,9 @@ TEST(test_bplus_tree, test_chars)
   const char *index_name = "chars.btree";
   ::remove(index_name);
   handler = new BplusTreeHandler();
-  handler->create(index_name, CHARS, 8, ORDER, ORDER);
+  FieldMeta field;
+  field.init("test", CHARS, 0, 8, true);
+  handler->create(index_name, { &field }, ORDER, ORDER);
 
   char keys[][9] = {
     "abcdefg",
@@ -522,7 +526,9 @@ TEST(test_bplus_tree, test_scanner)
   const char *index_name = "scanner.btree";
   ::remove(index_name);
   handler = new BplusTreeHandler();
-  handler->create(index_name, INTS, sizeof(int), ORDER, ORDER);
+  FieldMeta field;
+  field.init("test", INTS, 0, 4, true);
+  handler->create(index_name, { &field }, ORDER, ORDER);
 
   int count = 0;
   RC rc = RC::SUCCESS;
@@ -730,7 +736,10 @@ TEST(test_bplus_tree, test_bplus_tree_insert)
 
   ::remove(index_name);
   handler = new BplusTreeHandler();
-  handler->create(index_name, INTS, sizeof(int), ORDER, ORDER);
+  
+  FieldMeta field;
+  field.init("test", INTS, 0, 4, true);
+  handler->create(index_name, { &field }, ORDER, ORDER);
 
   test_insert();
 

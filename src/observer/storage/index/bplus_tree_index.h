@@ -23,8 +23,8 @@ public:
   BplusTreeIndex() = default;
   virtual ~BplusTreeIndex() noexcept;
 
-  RC create(const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta);
-  RC open(const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta);
+  RC create(const char *file_name, const IndexMeta &index_meta, const std::vector<const FieldMeta *> &field_meta);
+  RC open(const char *file_name, const IndexMeta &index_meta, const std::vector<const FieldMeta *> &field_meta);
   RC drop();
   RC close();
 
@@ -40,6 +40,8 @@ public:
 			       const char *right_key, int right_len, bool right_inclusive) override;
 
   RC sync() override;
+
+  char *make_userkey(const char *record) const;
 
 private:
   bool inited_ = false;

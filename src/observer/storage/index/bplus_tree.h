@@ -23,6 +23,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "storage/record/record_manager.h"
 #include "storage/default/disk_buffer_pool.h"
+#include "storage/common/field_meta.h"
 #include "sql/parser/parse_defs.h"
 #include "util/comparator.h"
 
@@ -32,18 +33,23 @@ See the Mulan PSL v2 for more details. */
 class AttrComparator
 {
 public:
-  void init(AttrType type, int length)
+  void init(AttrType *attr_types, int *attr_lengths, int attr_num)
   {
-    attr_type_ = type;
-    attr_length_ = length;
+    attr_types_ = attr_types;
+    attr_lengths_ = attr_lengths;
+    attr_num_ = attr_num;
+    total_attr_length_ = 0;
+    for(int i = 0; i < attr_num; ++ i) {
+      total_attr_length_ += attr_lengths[i];
+    }
   }
 
   int attr_length() const {
-    return attr_length_;
+    return total_attr_length_;
   }
 
-  int operator()(const char *v1, const char *v2) const {
-    switch (attr_type_) {
+  int compare(const char *v1, const char *v2, int attr_type, int attr_length) const {
+    switch (attr_type) {
     case INTS: {
       return compare_int((void *)v1, (void *)v2);
     }
@@ -54,25 +60,40 @@ public:
       return compare_float((void *)v1, (void *)v2);
     }
     case CHARS: {
-      return compare_string((void *)v1, attr_length_, (void *)v2, attr_length_);
+      return compare_string((void *)v1, attr_length, (void *)v2, attr_length);
     }
     default:{
-      LOG_ERROR("unknown attr type. %d", attr_type_);
+      LOG_ERROR("unknown attr type. %d", attr_type);
       abort();
     }
     }
   }
+
+  int operator()(const char *v1, const char *v2) const {
+    int offset = 0;
+    for(int i = 0; i < attr_num_; ++ i) {
+      int ret = compare(v1 + offset, v2 + offset, attr_types_[i], attr_lengths_[i]);
+      if(ret != 0) {
+        return ret;
+      }
+      offset += attr_lengths_[i];
+    }
+    return 0;
+  }
+
 private:
-  AttrType attr_type_;
-  int attr_length_;
+  int attr_num_;
+  int total_attr_length_;
+  AttrType *attr_types_; // point to file_header_.attr_types
+  int *attr_lengths_;    // point to file_header_.attr_lengths
 };
 
 class KeyComparator
 {
 public:
-  void init(AttrType type, int length)
+  void init(AttrType *attr_types, int *attr_lengths, int attr_num)
   {
-    attr_comparator_.init(type, length);
+    attr_comparator_.init(attr_types, attr_lengths, attr_num);
   }
 
   const AttrComparator &attr_comparator() const {
@@ -97,55 +118,76 @@ private:
 class AttrPrinter
 {
 public:
-  void init(AttrType type, int length)
+  void init(AttrType *attr_types, int *attr_lengths, int attr_num)
   {
-    attr_type_ = type;
-    attr_length_ = length;
+    attr_types_ = attr_types;
+    attr_lengths_ = attr_lengths;
+    attr_num_ = attr_num;
+    total_attr_length_ = 0;
+    for(int i = 0; i < attr_num; ++ i) {
+      total_attr_length_ += attr_lengths[i];
+    }
   }
 
   int attr_length() const {
-    return attr_length_;
+    return total_attr_length_;
   }
 
   std::string operator()(const char *v) const {
-    switch (attr_type_) {
-    case INTS: {
-      return std::to_string(*(int*)v);
-    }
-    case DATES:{
-      return std::to_string(*(int*)v);
-    }
-    case FLOATS: {
-      return std::to_string(*(float*)v);
-    }
-    case CHARS: {
-      std::string str;
-      for (int i = 0; i < attr_length_; i++) {
-	if (v[i] == 0) {
-	  break;
-	}
-	str.push_back(v[i]);
+    std::stringstream ss;
+    ss << "[";
+    for(int i = 0; i < attr_num_; ++ i) {
+      if (i != 0) {
+        ss << ", ";
       }
-      return str;
-    }
+      switch (attr_types_[i]) {
+      case INTS: {
+        ss << std::to_string(*(int*)v);
+        break;
+      }
+      case DATES:{
+        std::string s = std::to_string(*(int*)v);
+        ss << s.substr(0, 4) << "-" << s.substr(4,2) << "-" << s.substr(6, 2);
+        break;
+      }
+      case FLOATS: {
+        ss << std::to_string(*(float*)v);
+        break;
+      }
+      case CHARS: {
+        for (int i = 0; i < attr_lengths_[i]; i++) {
+          if (v[i] == 0) {
+            break;
+          }
+          ss << v[i];
+        }
+        break;
+      }
 
-    default:{
-      LOG_ERROR("unknown attr type. %d", attr_type_);
-      abort();
+      default:{
+        LOG_ERROR("unknown attr type. %d", attr_types_[i]);
+        abort();
+      }
+      }
+
+      v += attr_lengths_[i];
     }
-    }
+    ss << "]";
+    return ss.str();
   }
 private:
-  AttrType attr_type_;
-  int attr_length_;
+  int attr_num_;
+  int total_attr_length_;
+  AttrType *attr_types_; // point to file_header_.attr_types
+  int *attr_lengths_;    // point to file_header_.attr_lengths
 };
 
 class KeyPrinter
 {
 public:
-  void init(AttrType type, int length)
+  void init(AttrType *attr_types, int *attr_lengths, int attr_num)
   {
-    attr_printer_.init(type, length);
+    attr_printer_.init(attr_types, attr_lengths, attr_num);
   }
 
   const AttrPrinter &attr_printer() const {
@@ -179,17 +221,30 @@ struct IndexFileHeader {
   PageNum  root_page;
   int32_t  internal_max_size;
   int32_t  leaf_max_size;
+  int32_t  attr_num;
   int32_t  attr_length;
+  int32_t  attr_lengths[MAX_NUM];
+  AttrType attr_types[MAX_NUM];
   int32_t  key_length; // attr length + sizeof(RID)
-  AttrType attr_type;
 
   const std::string to_string()
   {
     std::stringstream ss;
+    std::string len_str("[");
+    std::string type_str("[");
+    for(int i = 0; i < attr_num; ++ i) {
+      if (i != 0) {
+        len_str.append(", ");
+        type_str.append(", ");
+      }
+      len_str.append(std::to_string(attr_lengths[i]));
+      type_str.append(std::to_string(attr_types[i]));
+    }
 
-    ss << "attr_length:" << attr_length << ","
+    ss << "attr_num:" << attr_num << ","
+       << "attr_length:" << len_str << ","
+       << "attr_type:" << type_str << ","
        << "key_length:" << key_length << ","
-       << "attr_type:" << attr_type << ","
        << "root_page:" << root_page << ","
        << "internal_max_size:" << internal_max_size << ","
        << "leaf_max_size:" << leaf_max_size << ";";
@@ -390,7 +445,7 @@ public:
    * 此函数创建一个名为fileName的索引。
    * attrType描述被索引属性的类型，attrLength描述被索引属性的长度
    */
-  RC create(const char *file_name, AttrType attr_type, int attr_length,
+  RC create(const char *file_name, const std::vector<const FieldMeta *> &field_meta,
 	    int internal_max_size = -1, int leaf_max_size = -1);
 
   /**
@@ -424,6 +479,10 @@ public:
   RC update_entry(const char *data, const RID *rid, const char *new_data);
 
   bool is_empty() const;
+
+  int attr_length() const {
+    return file_header_.attr_length;
+  }
 
   /**
    * 获取指定值的record

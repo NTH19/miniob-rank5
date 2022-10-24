@@ -18,20 +18,21 @@ See the Mulan PSL v2 for more details. */
 #include "storage/common/db.h"
 #include "storage/common/table.h"
 
-UpdateStmt::UpdateStmt(Table *table, const Value* values, int value_amount,FilterStmt *filter_stmt,const char * attribute_name,const char * new_data,const Updates &up)
-  : table_ (table), values_(values), value_amount_(value_amount),filter_stmt_(filter_stmt),attribute_name_(attribute_name),new_data_(new_data),condition_num(up.condition_num)
+UpdateStmt::UpdateStmt(Table *table, const Value* values, int value_amount, FilterStmt *filter_stmt, const FieldMeta *field)
+  : table_ (table), values_(values), value_amount_(value_amount), 
+    filter_stmt_(filter_stmt), field_(field)
 {
-  memcpy(conditions,up.conditions,sizeof(Condition)*up.condition_num);
 }
+
 UpdateStmt::~UpdateStmt(){
   if (nullptr != filter_stmt_) {
     delete filter_stmt_;
     filter_stmt_ = nullptr;
   } 
 }
+
 RC UpdateStmt::create(Db *db, const Updates &update, Stmt *&stmt)
 {
-
   stmt = nullptr;
   const char *table_name = update.relation_name;
   if (nullptr == db || nullptr == table_name) {
@@ -46,6 +47,18 @@ RC UpdateStmt::create(Db *db, const Updates &update, Stmt *&stmt)
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
+  const FieldMeta *field = table->table_meta().field(update.attribute_name);
+  if (nullptr == field) {
+    LOG_WARN("no such field. field=%s.%s.%s", db->name(), table->name(), update.attribute_name);
+    return RC::SCHEMA_TABLE_NOT_EXIST;
+  }
+
+  // CHAR and TEXT is same
+  if (field->type() != update.value.type && (field->type() != TEXTS || update.value.type != CHARS)) {
+    LOG_WARN("field type not match. field=%s.%s.%s", db->name(), table->name(), update.attribute_name);
+    return RC::SCHEMA_TABLE_NOT_EXIST;
+  }
+
   std::unordered_map<std::string, Table *> table_map;
   table_map.insert(std::pair<std::string, Table *>(std::string(table_name), table));
 
@@ -56,6 +69,6 @@ RC UpdateStmt::create(Db *db, const Updates &update, Stmt *&stmt)
     LOG_WARN("failed to create filter statement. rc=%d:%s", rc, strrc(rc));
     return rc;
   }
-  stmt = new UpdateStmt(table,&update.value,1,filter_stmt,update.attribute_name,(char *)update.value.data,update);
+  stmt = new UpdateStmt(table, &update.value, 1, filter_stmt, field);
   return rc;
 }

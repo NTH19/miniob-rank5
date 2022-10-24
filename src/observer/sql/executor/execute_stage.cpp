@@ -855,7 +855,8 @@ RC ExecuteStage::do_create_index(SQLStageEvent *sql_event)
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-  RC rc = table->create_index(nullptr, create_index.index_name, create_index.attribute_name);
+  RC rc = table->create_index(nullptr, create_index.index_name, 
+            create_index.attribute_name, create_index.attribute_count);
   sql_event->session_event()->set_response(rc == RC::SUCCESS ? "SUCCESS\n" : "FAILURE\n");
   return rc;
 }
@@ -945,7 +946,6 @@ RC ExecuteStage::do_insert(SQLStageEvent *sql_event)
   for (int i = 0, j = 0; i < inserts.record_num; i++, j = inserts.record_length[i - 1]) {
     if (inserts.record_length[i] - j != cnt) {
       LOG_ERROR("record %d has wrong length %d - %d should be %d", i, inserts.record_length[i], j, cnt);
-      end_trx_if_need(session, trx, false);
       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }
   }
@@ -966,15 +966,12 @@ RC ExecuteStage::do_insert(SQLStageEvent *sql_event)
       if (rc != RC::SUCCESS) {
         session_event->set_response("FAILURE\n");
         return rc;
-      }
-
+      } 
+      end_trx_if_need(session, trx, true);
       trx->next_current_id();
-      session_event->set_response("SUCCESS\n");
-    } else {
-      session_event->set_response("SUCCESS\n");
     }
+    session_event->set_response("SUCCESS\n");
   } else {
-
     session_event->set_response("FAILURE\n");
   }
   return rc;
@@ -991,13 +988,13 @@ RC ExecuteStage::do_update(UpdateStmt *update_stmt, SessionEvent *session_event)
   Trx *trx = session->current_trx();
   CLogManager *clog_manager = db->get_clog_manager();
   TableScanOperator scan_oper(update_stmt->table());
-  // todo
   PredicateOperator pred_oper(update_stmt->filter_stmt());
   pred_oper.add_child(&scan_oper);
-  UpdateOperator update_oper(update_stmt);
+  UpdateOperator update_oper(update_stmt, trx);
   update_oper.add_child(&pred_oper);
 
   rc = update_oper.open();
+  update_oper.close();
   if (rc != RC::SUCCESS) {
     session_event->set_response("FAILURE\n");
   } else {
@@ -1013,7 +1010,8 @@ RC ExecuteStage::do_update(UpdateStmt *update_stmt, SessionEvent *session_event)
       if (rc != RC::SUCCESS) {
         session_event->set_response("FAILURE\n");
         return rc;
-      }
+      } 
+      end_trx_if_need(session, trx, true);
       trx->next_current_id();
       session_event->set_response("SUCCESS\n");
     }
