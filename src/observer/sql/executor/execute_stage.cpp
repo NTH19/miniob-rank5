@@ -619,6 +619,18 @@ void dfs(std::vector<Table *> &tables, int step, const std::vector<Field> query_
             canAdd=false;
             break;
           }
+        }else if(mtoF.count(std::pair<std::string, std::string>(std::string(nowTablename),tables[i]->name()))){
+          auto [l, r, cmp] = mtoF[std::pair<std::string, std::string>(nowTablename, tables[i]->name())];
+          TupleCell left_cell;
+          TupleCell right_cell;
+          if (l->get_value(*tuple, left_cell) == RC::NOTFOUND)
+            continue;
+          if (r->get_value(*tuples[i], right_cell) == RC::NOTFOUND)
+            continue;
+          if(!gen_compare_res(left_cell, right_cell, cmp)){
+            canAdd=false;
+            break;
+          }
         }
       }
     } else canAdd = true;
@@ -668,7 +680,6 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   // select mutiple tables happens here
   if (select_stmt->tables().size() > 1) {
     auto tables = select_stmt->tables();
-    //if(select_stmt->need_reverse_join!=0xff ||tables.size()>2)
     std::reverse(tables.begin(), tables.end());
     auto cons = select_stmt->filter_stmt()->filter_units();
     FieldExpr *left_attr;
@@ -682,7 +693,6 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
         need_join = true;
         mtoF[std::pair<std::string, std::string>(left_attr->table_name(), right_attr->table_name())] =
             std::tuple<FieldExpr *, FieldExpr *, CompOp>(left_attr, right_attr, cons[i]->comp());
-        // mtoF[std::pair<std::string,std::string>(left_attr->table_name(),right_attr->table_name())]=std::pair<FieldExpr*,FieldExpr*>(left_attr,right_attr);
       }
     }
 
