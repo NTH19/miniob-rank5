@@ -302,10 +302,10 @@ void tuple_to_string(std::ostream &os, const Tuple &tuple)
       first_field = false;
     }
     // judge null value
-    if (strcmp((char*)(cell.data()), __NULL_DATA__) == 0) {
-      os <<  "NULL";
-    }
-    else cell.to_string(os);
+    if (strcmp((char *)(cell.data()), __NULL_DATA__) == 0) {
+      os << "NULL";
+    } else
+      cell.to_string(os);
   }
 }
 
@@ -446,12 +446,12 @@ IndexScanOperator *try_to_create_index_scan_operator(FilterStmt *filter_stmt)
   LOG_INFO("use index for scan: %s in table %s", index->index_meta().name(), table->name());
   return oper;
 }
-void do_aggfun(std::vector<std::pair<int,int>> &ret, std::vector<int> &char_len, const Tuple &tuple,
+void do_aggfun(std::vector<std::pair<int, int>> &ret, std::vector<int> &char_len, const Tuple &tuple,
     const std::vector<std::pair<DescribeFun, Field>> &funs)
 {
   TupleCell cell;
   RC rc = RC::SUCCESS;
-  bool flag=1;
+  bool flag = 1;
   for (int i = 0; i < tuple.cell_num(); i++) {
     rc = tuple.cell_at(i, cell);
     if (rc != RC::SUCCESS) {
@@ -460,15 +460,15 @@ void do_aggfun(std::vector<std::pair<int,int>> &ret, std::vector<int> &char_len,
     }
     cell.do_aggfun(ret[i], funs[i].first, char_len[i]);
   }
-  return ;
+  return;
 }
-void gen_result(std::vector<std::pair<int,int>> &ret, const std::vector<std::pair<DescribeFun, Field>> &funs, std::ostream &os,
-    int cnt, std::vector<int> &char_len)
+void gen_result(std::vector<std::pair<int, int>> &ret, const std::vector<std::pair<DescribeFun, Field>> &funs,
+    std::ostream &os, int cnt, std::vector<int> &char_len)
 {
   bool is_first = true;
   for (int i = 0; i < ret.size(); ++i) {
-    if(ret[i].second==0&&funs[i].first!=COUNT&&funs[i].first == COUNT_STAR){
-      os<<"null";
+    if (ret[i].second == 0 && funs[i].first != COUNT && funs[i].first == COUNT_STAR) {
+      os << "null";
       continue;
     }
     if (is_first) {
@@ -476,7 +476,7 @@ void gen_result(std::vector<std::pair<int,int>> &ret, const std::vector<std::pai
     } else
       os << " | ";
     if (funs[i].first == AVG) {
-      os << static_cast<float>( ret[i].first)/ ret[i].second;
+      os << static_cast<float>(ret[i].first) / ret[i].second;
       continue;
     }
     if (funs[i].first == COUNT || funs[i].first == COUNT_STAR) {
@@ -497,12 +497,12 @@ void gen_result(std::vector<std::pair<int,int>> &ret, const std::vector<std::pai
   }
   os << "\n";
 }
-void init_ret_aggfun(
-    std::vector<std::pair<int,int>> &ret, const std::vector<std::pair<DescribeFun, Field>> &funs, std::vector<int> &char_len)
+void init_ret_aggfun(std::vector<std::pair<int, int>> &ret, const std::vector<std::pair<DescribeFun, Field>> &funs,
+    std::vector<int> &char_len)
 {
   int n = ret.size();
   for (int i = 0; i < n; ++i) {
-    ret[i].second=0;
+    ret[i].second = 0;
     if (funs[i].first == MIN) {
       if (funs[i].second.attr_type() == CHARS) {
         memset(&ret[i].first, 127, 4);
@@ -510,14 +510,14 @@ void init_ret_aggfun(
       } else if (funs[i].second.attr_type() == FLOATS) {
         *(float *)&ret[i].first = 99999999;
       } else if (funs[i].second.attr_type() == INTS) {
-        ret[i].first= INT32_MAX;
+        ret[i].first = INT32_MAX;
       }
     } else if (funs[i].first == MAX) {
       if (funs[i].second.attr_type() == CHARS) {
         memset(&ret[i].first, 0, 4);
         char_len[i] = 3;
       } else if (funs[i].second.attr_type() == FLOATS) {
-        *(float *)&ret[i] .first= 0;
+        *(float *)&ret[i].first = 0;
       } else if (funs[i].second.attr_type() == INTS) {
         ret[i].first = -100000;
       }
@@ -526,171 +526,230 @@ void init_ret_aggfun(
     }
   }
 }
-void p_mutiple_table_header(std::ostream &os, std::vector<ProjectOperator> &p,bool need_reverse)
+void p_mutiple_table_header(std::ostream &os, std::vector<ProjectOperator> &p, bool need_reverse)
 {
   int j = 0;
-  int n=p.size();
-  if(need_reverse){
-    for (int k=n-1;k>=0;--k) {
-    const int cell_num = p[k].tuple_cell_num();
-    const TupleCellSpec *cell_spec = nullptr;
-    if (j) {
-      os << " | ";
-    }
-    j++;
-    for (int i = 0; i < cell_num; i++) {
-      p[k].tuple_cell_spec_at(i, cell_spec);
-      if (i != 0) {
+  int n = p.size();
+  if (need_reverse) {
+    for (int k = n - 1; k >= 0; --k) {
+      const int cell_num = p[k].tuple_cell_num();
+      const TupleCellSpec *cell_spec = nullptr;
+      if (j) {
         os << " | ";
       }
-      if (cell_spec->alias()) {
-        os << cell_spec->alias();
+      j++;
+      for (int i = 0; i < cell_num; i++) {
+        p[k].tuple_cell_spec_at(i, cell_spec);
+        if (i != 0) {
+          os << " | ";
+        }
+        if (cell_spec->alias()) {
+          os << cell_spec->alias();
+        }
       }
     }
-  }
-  }else{
-    for (int k=0;k<n;++k) {
-    const int cell_num = p[k].tuple_cell_num();
-    const TupleCellSpec *cell_spec = nullptr;
-    if (j) {
-      os << " | ";
-    }
-    j++;
-    for (int i = 0; i < cell_num; i++) {
-      p[k].tuple_cell_spec_at(i, cell_spec);
-      if (i != 0) {
+  } else {
+    for (int k = 0; k < n; ++k) {
+      const int cell_num = p[k].tuple_cell_num();
+      const TupleCellSpec *cell_spec = nullptr;
+      if (j) {
         os << " | ";
       }
-      if (cell_spec->alias()) {
-        os << cell_spec->alias();
+      j++;
+      for (int i = 0; i < cell_num; i++) {
+        p[k].tuple_cell_spec_at(i, cell_spec);
+        if (i != 0) {
+          os << " | ";
+        }
+        if (cell_spec->alias()) {
+          os << cell_spec->alias();
+        }
       }
     }
   }
-  }
-  
+
   os << "\n";
 }
+bool gen_compare_res(TupleCell &left_cell, TupleCell &right_cell, CompOp &cmp)
+{
+  bool canAdd = false;
 
-void dfs(std::vector<Table*>&tables,int step,const std::vector<Field>query_fields,
-RowTuple* lastTuple,std::string lastRes,std::ostream &os,std::map<std::pair<std::string,std::string>,std::tuple<FieldExpr*,FieldExpr*,CompOp>>&mtoF,
-std::map<std::string,ProjectOperator*>&tableToProject,FilterStmt* filter,bool needJoin,std::string lastTablename){
+  const int compare = left_cell.compare(right_cell);
+  bool filter_result;
+
+  if (left_cell.data() == nullptr || right_cell.data() == nullptr) {
+    switch (cmp) {
+      case EQUAL_TO:
+      case LESS_EQUAL:
+      case NOT_EQUAL:
+      case LESS_THAN:
+      case GREAT_EQUAL:
+      case GREAT_THAN: {
+        filter_result = 0;
+      } break;
+      case LIKE_TO: {
+        filter_result = left_cell.like(right_cell);
+      } break;
+      case NOT_LIKE: {
+        filter_result = !left_cell.like(right_cell);
+      } break;
+      case COMP_IS_NOT: {
+        if ((left_cell.data() != nullptr &&
+                (!(memcmp((void *)left_cell.data(), __NULL_DATA__, 4)) && right_cell.data() == nullptr)) ||
+            ((right_cell.data() != nullptr && !(memcmp((void *)right_cell.data(), __NULL_DATA__, 4)) &&
+                left_cell.data() == nullptr)))
+          filter_result = 0;
+        else {
+          filter_result = 1;
+        }
+      } break;
+      case COMP_IS: {
+        if ((left_cell.data() != nullptr &&
+                (!(memcmp((void *)left_cell.data(), __NULL_DATA__, 4)) && right_cell.data() == nullptr)) ||
+            ((right_cell.data() != nullptr && !(memcmp((void *)right_cell.data(), __NULL_DATA__, 4)) &&
+                left_cell.data() == nullptr)))
+          filter_result = 1;
+        else {
+          filter_result = 0;
+        }
+      } break;
+      default: {
+        // LOG_WARN("invalid compare type: %d", comp);
+      } break;
+    }
+  } else {
+    switch (cmp) {
+      case EQUAL_TO: {
+        filter_result = (0 == compare);
+      } break;
+      case LESS_EQUAL: {
+        filter_result = (compare <= 0);
+      } break;
+      case NOT_EQUAL: {
+        filter_result = (compare != 0);
+      } break;
+      case LESS_THAN: {
+        filter_result = (compare < 0);
+      } break;
+      case GREAT_EQUAL: {
+        filter_result = (compare >= 0);
+      } break;
+      case GREAT_THAN: {
+        filter_result = (compare > 0);
+      } break;
+      case LIKE_TO: {
+        filter_result = left_cell.like(right_cell);
+      } break;
+      case NOT_LIKE: {
+        filter_result = !left_cell.like(right_cell);
+      } break;
+      case COMP_IS_NOT: {
+        if (left_cell.data() == nullptr && right_cell.data() == nullptr)
+          filter_result = 0;
+        else {
+          filter_result = 1;
+        }
+      } break;
+      case COMP_IS: {
+        if (left_cell.data() == nullptr && right_cell.data() == nullptr)
+          filter_result = 1;
+        else {
+          filter_result = 0;
+        }
+      } break;
+      default:  break;
+    }
+  }
+  return filter_result;
+}
+void dfs(std::vector<Table *> &tables, int step, const std::vector<Field> query_fields, RowTuple *lastTuple,
+    std::string lastRes, std::string &res,
+    std::map<std::pair<std::string, std::string>, std::vector<std::tuple<FieldExpr *, FieldExpr *, CompOp>>> &mtoF,
+    std::map<std::string, ProjectOperator *> &tableToProject, FilterStmt *filter, bool needJoin,
+    std::vector<RowTuple *> &tuples)
+{
   auto scan_oper = new TableScanOperator(tables[step]);
-  auto pred_oper=new PredicateOperator (filter);
+  auto pred_oper = new PredicateOperator(filter);
   pred_oper->add_child(scan_oper);
   pred_oper->open();
   std::string nowTablename(tables[step]->name());
-  while ( pred_oper->next() == RC::SUCCESS) {
+  while (pred_oper->next() == RC::SUCCESS) {
     RowTuple *tuple = dynamic_cast<RowTuple *>(pred_oper->current_tuple());
     if (nullptr == tuple) {
       LOG_ERROR("DFS empty\n!!!!!");
       break;
     }
-    bool canAdd=false;
-    if(needJoin){
-      if(mtoF.count(std::pair<std::string,std::string>(lastTablename,nowTablename))){
-        auto [l,r,cmp]= mtoF[std::pair<std::string,std::string>(lastTablename,nowTablename)];
-        TupleCell left_cell;
-        TupleCell right_cell;
-        if(l->get_value(*lastTuple, left_cell)==RC::NOTFOUND)continue;
-        if(r->get_value(*tuple, right_cell)==RC::NOTFOUND)continue;
-        const int compare = left_cell.compare(right_cell);
-        bool filter_result;
-        if (left_cell.data()==nullptr||right_cell.data()==nullptr){
-      switch (cmp) {
-    case EQUAL_TO: 
-    case LESS_EQUAL: 
-    case NOT_EQUAL: 
-    case LESS_THAN:
-    case GREAT_EQUAL: 
-    case GREAT_THAN: {
-      filter_result = 0;
-    } break;
-    case LIKE_TO: {
-      filter_result = left_cell.like(right_cell);
-    } break;
-    case NOT_LIKE: {
-      filter_result = !left_cell.like(right_cell);
-    } break;
-    case COMP_IS_NOT:{
-      if ((left_cell.data()!=nullptr&&(!(memcmp((void*)left_cell.data(),__NULL_DATA__,4))&&right_cell.data()==nullptr)) ||  
-      ((right_cell.data()!=nullptr&&!(memcmp((void*)right_cell.data(),__NULL_DATA__,4))&&left_cell.data()==nullptr))) filter_result =0;
-      else {
-          filter_result =1;
-      }
-    }break;
-    case COMP_IS: {
-    if ((left_cell.data()!=nullptr&&(!(memcmp((void*)left_cell.data(),__NULL_DATA__,4))&&right_cell.data()==nullptr)) ||  
-      ((right_cell.data()!=nullptr&&!(memcmp((void*)right_cell.data(),__NULL_DATA__,4))&&left_cell.data()==nullptr))) filter_result =1;
-    else {
-          filter_result =0;
-      }
-    }break;
-    default: {
-      // LOG_WARN("invalid compare type: %d", comp);
-    } break;
-    }
-    }
-    else {
-    switch (cmp) {
-    case EQUAL_TO: {
-      filter_result = (0 == compare); 
-    } break;
-    case LESS_EQUAL: {
-      filter_result = (compare <= 0); 
-    } break;
-    case NOT_EQUAL: {
-      filter_result = (compare != 0);
-    } break;
-    case LESS_THAN: {
-      filter_result = (compare < 0);
-    } break;
-    case GREAT_EQUAL: {
-      filter_result = (compare >= 0);
-    } break;
-    case GREAT_THAN: {
-      filter_result = (compare > 0);
-    } break;
-    case LIKE_TO: {
-      filter_result = left_cell.like(right_cell);
-    } break;
-    case NOT_LIKE: {
-      filter_result = !left_cell.like(right_cell);
-    } break;
-    case COMP_IS_NOT:{
-      if (left_cell.data()==nullptr&&right_cell.data()==nullptr) filter_result =0;
-      else {
-          filter_result =1;
-      }
-    }break;
-    case COMP_IS: {
-    if (left_cell.data()==nullptr&&right_cell.data()==nullptr) filter_result =1;
-    else {
-          filter_result =0;
-      }
-    }break;
-    default: {
-      // LOG_WARN("invalid compare type: %d", comp);
-    } break;
-      }
+    bool canAdd = false;
+    if (needJoin) {
+      canAdd = true;
+      for (int i = 0; i < step; ++i) {
+        if (mtoF.count(std::pair<std::string, std::string>(std::string(tables[i]->name()), nowTablename))) {
+          auto ve = mtoF[std::pair<std::string, std::string>(std::string(tables[i]->name()), nowTablename)];
+          for (auto &x : ve) {
+            auto [l, r, cmp] = x;
+            TupleCell left_cell;
+            TupleCell right_cell;
+            if (l->get_value(*tuples[i], left_cell) == RC::NOTFOUND)
+              continue;
+            if (r->get_value(*tuple, right_cell) == RC::NOTFOUND)
+              continue;
+            if (!gen_compare_res(left_cell, right_cell, cmp)) {
+              canAdd = false;
+              break;
+            }
+          }
+
+        } else if (mtoF.count(std::pair<std::string, std::string>(std::string(nowTablename), tables[i]->name()))) {
+          auto ve = mtoF[std::pair<std::string, std::string>(nowTablename, tables[i]->name())];
+          for (auto &v : ve) {
+            auto [l, r, cmp] = v;
+            TupleCell left_cell;
+            TupleCell right_cell;
+            if (l->get_value(*tuple, left_cell) == RC::NOTFOUND)
+              continue;
+            if (r->get_value(*tuples[i], right_cell) == RC::NOTFOUND)
+              continue;
+            if (!gen_compare_res(left_cell, right_cell, cmp)) {
+              canAdd = false;
+              break;
+            }
+          }
         }
-        canAdd=filter_result;
-      }else canAdd=true;
-    }else canAdd=true;
-    if(canAdd){
-      ProjectTuple* p2;
-      std::stringstream kl; 
-      if(tableToProject.count(nowTablename)){
-        p2=dynamic_cast<ProjectTuple *>(tableToProject[nowTablename]->for_mu_tables());
+      }
+    } else
+      canAdd = true;
+    if (canAdd) {
+      ProjectTuple *p2;
+      std::stringstream kl;
+      if (tableToProject.count(nowTablename)) {
+        p2 = dynamic_cast<ProjectTuple *>(tableToProject[nowTablename]->for_mu_tables());
         p2->set_tuple(tuple);
         tuple_to_string(kl, *p2);
         std::string temp(kl.str());
-        if(step!=tables.size()-1)dfs(tables,step+1,query_fields,tuple,lastRes+(step==0?"":" | ")+temp,os,mtoF,tableToProject,filter,needJoin,nowTablename);
-        else os<<lastRes+((step==0 ||lastRes.size()==0)?"":" | ")+temp<<"\n";
-      }else {
-        if(step!=tables.size()-1)dfs(tables,step+1,query_fields,tuple,lastRes,os,mtoF,tableToProject,filter,needJoin,nowTablename);
-        else os<<lastRes;
+        if (step != tables.size() - 1) {
+          tuples.push_back(tuple);
+          dfs(tables,
+              step + 1,
+              query_fields,
+              tuple,
+              lastRes + (step == 0 ? "" : " | ") + temp,
+              res,
+              mtoF,
+              tableToProject,
+              filter,
+              needJoin,
+              tuples);
+          tuples.pop_back();
+        } else
+          res = res + lastRes + ((step == 0 || lastRes.size() == 0) ? "" : " | ") + temp + "\n";
+      } else {
+        if (step != tables.size() - 1) {
+          tuples.push_back(tuple);
+          dfs(tables, step + 1, query_fields, tuple, lastRes, res, mtoF, tableToProject, filter, needJoin, tuples);
+          tuples.pop_back();
+        } else
+          res = res + lastRes + "\n";
       }
-      
     }
   }
   pred_oper->close();
@@ -705,18 +764,19 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   // select mutiple tables happens here
   if (select_stmt->tables().size() > 1) {
     auto tables = select_stmt->tables();
+    std::reverse(tables.begin(), tables.end());
     auto cons = select_stmt->filter_stmt()->filter_units();
     FieldExpr *left_attr;
     FieldExpr *right_attr;
-    std::map<std::pair<std::string,std::string>,std::tuple<FieldExpr*,FieldExpr*,CompOp>>mtoF;
+    std::map<std::pair<std::string, std::string>, std::vector<std::tuple<FieldExpr *, FieldExpr *, CompOp>>> mtoF;
     bool need_join = false;
     for (int i = 0; i < cons.size(); ++i) {
       if (dynamic_cast<FieldExpr *>(cons[i]->left()) != 0 && dynamic_cast<FieldExpr *>(cons[i]->right()) != 0) {
         left_attr = dynamic_cast<FieldExpr *>(cons[i]->left());
         right_attr = dynamic_cast<FieldExpr *>(cons[i]->right());
         need_join = true;
-        mtoF[std::pair<std::string,std::string>(left_attr->table_name(),right_attr->table_name())]=std::tuple<FieldExpr*,FieldExpr*,CompOp>(left_attr,right_attr,cons[i]->comp());
-        //mtoF[std::pair<std::string,std::string>(left_attr->table_name(),right_attr->table_name())]=std::pair<FieldExpr*,FieldExpr*>(left_attr,right_attr);
+        mtoF[std::pair<std::string, std::string>(left_attr->table_name(), right_attr->table_name())].push_back(
+            std::tuple<FieldExpr *, FieldExpr *, CompOp>(left_attr, right_attr, cons[i]->comp()));
       }
     }
 
@@ -727,21 +787,22 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     std::stringstream ss;
     std::vector<ProjectOperator> project_oper(10);
     auto &query_fields = select_stmt->query_fields();
-    std::map<std::string,ProjectOperator*>m;
+    std::map<std::string, ProjectOperator *> m;
     int accuse;
     for (int i = 0, j = 0; i < query_fields.size(); ++i) {
       if (i && query_fields[i].table_name() != query_fields[i - 1].table_name()) {
         j++;
       }
-      accuse=j;
+      accuse = j;
       project_oper[j].add_projection(query_fields[i].table(), query_fields[i].meta(), true);
-      m[std::string(query_fields[i].table()->name())]=&project_oper[j];
+      m[std::string(query_fields[i].table()->name())] = &project_oper[j];
     }
-    project_oper.resize(accuse+1);
-    p_mutiple_table_header(ss, project_oper,select_stmt->need_reverse);
-    std::reverse(tables.begin(),tables.end());
-    dfs(tables,0,query_fields,nullptr,"",ss,mtoF,m,select_stmt->filter_stmt(),need_join,"0dummy");
-    session_event->set_response(ss.str());
+    project_oper.resize(accuse + 1);
+    p_mutiple_table_header(ss, project_oper, select_stmt->need_reverse);
+    std::vector<RowTuple *> start;
+    std::string res;
+    dfs(tables, 0, query_fields, nullptr, "", res, mtoF, m, select_stmt->filter_stmt(), need_join, start);
+    session_event->set_response(ss.str() + res);
     return rc;
   }
 
@@ -764,7 +825,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     }
     std::stringstream ss;
     print_aggfun_header(ss, funs);
-    std::vector<std::pair<int,int>> ret(funs.size());
+    std::vector<std::pair<int, int>> ret(funs.size());
     std::vector<int> char_len(funs.size(), 0);
     init_ret_aggfun(ret, funs, char_len);
     int cnt = 0;
@@ -777,7 +838,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
         LOG_WARN("failed to get current record. rc=%s", strrc(rc));
         break;
       }
-    do_aggfun(ret, char_len, *tuple, funs);
+      do_aggfun(ret, char_len, *tuple, funs);
     }
 
     if (rc != RC::RECORD_EOF) {
@@ -799,8 +860,8 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     if (dynamic_cast<ValueExpr *>(filter_unit->left())) {
       filter_unit->left()->get_value(t, cell);
       auto p = cell.data();
-       auto thistype= cell.attr_type();
-      if (p == nullptr&& thistype==DATES) {
+      auto thistype = cell.attr_type();
+      if (p == nullptr && thistype == DATES) {
         session_event->set_response("FAILURE\n");
         return RC::INVALID_ARGUMENT;
       }
@@ -808,8 +869,8 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     if (dynamic_cast<ValueExpr *>(filter_unit->right())) {
       filter_unit->right()->get_value(t, cell);
       auto p = cell.data();
-      auto thistype= cell.attr_type();
-      if (p == nullptr&& thistype==DATES) {
+      auto thistype = cell.attr_type();
+      if (p == nullptr && thistype == DATES) {
         session_event->set_response("FAILURE\n");
         return RC::INVALID_ARGUMENT;
       }
@@ -836,7 +897,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     return rc;
   }
 
-  Table * thistable = select_stmt->tables()[0];
+  Table *thistable = select_stmt->tables()[0];
   std::stringstream ss;
   print_tuple_header(ss, project_oper);
   while ((rc = project_oper.next()) == RC::SUCCESS) {
@@ -926,8 +987,8 @@ RC ExecuteStage::do_create_index(SQLStageEvent *sql_event)
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-  RC rc = table->create_index(nullptr, create_index.index_name, 
-            create_index.attribute_name, create_index.attribute_count);
+  RC rc =
+      table->create_index(nullptr, create_index.index_name, create_index.attribute_name, create_index.attribute_count);
   sql_event->session_event()->set_response(rc == RC::SUCCESS ? "SUCCESS\n" : "FAILURE\n");
   return rc;
 }
@@ -1006,7 +1067,7 @@ RC ExecuteStage::do_insert(SQLStageEvent *sql_event)
     const Value *v = insert_stmt->values_[k];
     for (int i = 0; i < insert_stmt->value_amount(); i++) {
       const Value *vm = v + i;
-      if (vm->data == nullptr&&(vm->_is_null!=1)) {
+      if (vm->data == nullptr && (vm->_is_null != 1)) {
         session_event->set_response("FAILURE\n");
         return RC::INVALID_ARGUMENT;
       }
@@ -1037,7 +1098,7 @@ RC ExecuteStage::do_insert(SQLStageEvent *sql_event)
       if (rc != RC::SUCCESS) {
         session_event->set_response("FAILURE\n");
         return rc;
-      } 
+      }
       end_trx_if_need(session, trx, true);
       trx->next_current_id();
     }
@@ -1081,7 +1142,7 @@ RC ExecuteStage::do_update(UpdateStmt *update_stmt, SessionEvent *session_event)
       if (rc != RC::SUCCESS) {
         session_event->set_response("FAILURE\n");
         return rc;
-      } 
+      }
       end_trx_if_need(session, trx, true);
       trx->next_current_id();
       session_event->set_response("SUCCESS\n");
