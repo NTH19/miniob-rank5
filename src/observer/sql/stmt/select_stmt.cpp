@@ -70,6 +70,10 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
   std::vector<Field> fun_fields(select_sql.aggfun_num);
   for (int i = select_sql.aggfun_num - 1; i >= 0; i--) {
     const RelAttr &relation_attr = select_sql.aggFun[i].attr;
+    if (relation_attr.relation_name != nullptr && !table_map.count(relation_attr.relation_name)) {
+      LOG_WARN("invalid table name in aggregate: %s", relation_attr.relation_name);
+      return RC::SCHEMA_TABLE_NOT_EXIST;
+    }
     if ( 0==strcmp(relation_attr.attribute_name, "*")) {
       const FieldMeta *field_meta= tables[0]->table_meta().field(2);
       if (nullptr == field_meta) {

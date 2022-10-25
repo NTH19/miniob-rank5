@@ -442,34 +442,59 @@ update_select_attr:
 update_agg:
 	 COUNT_T LBRACE STAR RBRACE {
 		AggFun aggre;
-		Init_AggFun(&aggre,COUNT_STAR, "*");
+		Init_AggFun(&aggre, COUNT_STAR, "*");
 		updates_selects_append_aggfun(&CONTEXT->ssql->sstr.update,  &aggre);
 	}
 	| COUNT_T LBRACE ID RBRACE {
 		AggFun aggre;
-		Init_AggFun(&aggre,COUNT, $3);
+		Init_AggFun(&aggre, COUNT, $3);
+		updates_selects_append_aggfun(&CONTEXT->ssql->sstr.update, &aggre);
+	}
+	| COUNT_T LBRACE ID DOT ID RBRACE {
+		AggFun aggre;
+		Init_AggFun_Rel(&aggre, COUNT, $3, $5);
 		updates_selects_append_aggfun(&CONTEXT->ssql->sstr.update, &aggre);
 	}
 	| MAX_T LBRACE ID RBRACE {
 		AggFun aggre;
 		Init_AggFun(&aggre, MAX, $3);
 		updates_selects_append_aggfun(&CONTEXT->ssql->sstr.update, &aggre);
-	  }
+	}
+	| MAX_T LBRACE ID DOT ID RBRACE {
+		AggFun aggre;
+		Init_AggFun_Rel(&aggre, MAX, $3, $5);
+		updates_selects_append_aggfun(&CONTEXT->ssql->sstr.update, &aggre);
+	}
 	| MIN_T LBRACE ID RBRACE {
 		AggFun aggre;
 		Init_AggFun(&aggre, MIN, $3);
 		updates_selects_append_aggfun(&CONTEXT->ssql->sstr.update, &aggre);
-	  }
+	}
+	| MIN_T LBRACE ID DOT ID RBRACE {
+		AggFun aggre;
+		Init_AggFun_Rel(&aggre, MIN, $3, $5);
+		updates_selects_append_aggfun(&CONTEXT->ssql->sstr.update, &aggre);
+	}
 	| SUM_T LBRACE ID RBRACE {
 		AggFun aggre;
 		Init_AggFun(&aggre, SUM, $3);
 		updates_selects_append_aggfun(&CONTEXT->ssql->sstr.update, &aggre);
-	  }
+	}
+	| SUM_T LBRACE ID DOT ID RBRACE {
+		AggFun aggre;
+		Init_AggFun_Rel(&aggre, SUM, $3, $5);
+		updates_selects_append_aggfun(&CONTEXT->ssql->sstr.update, &aggre);
+	}
 	| AVG_T LBRACE ID RBRACE {
 		AggFun aggre;
 		Init_AggFun(&aggre, AVG, $3);
 		updates_selects_append_aggfun(&CONTEXT->ssql->sstr.update, &aggre);
-	  }
+	}
+	| AVG_T LBRACE ID DOT ID RBRACE {
+		AggFun aggre;
+		Init_AggFun_Rel(&aggre, AVG, $3, $5);
+		updates_selects_append_aggfun(&CONTEXT->ssql->sstr.update, &aggre);
+	}
 	;
 
 select:				/*  select 语句的语法解析树*/

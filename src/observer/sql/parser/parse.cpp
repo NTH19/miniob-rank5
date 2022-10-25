@@ -142,10 +142,17 @@ void selects_append_aggfun(Selects *selects, AggFun * a)
 {
   selects->aggFun[selects->aggfun_num++]=*a;
 }
-void Init_AggFun(AggFun * a,DescribeFun des,const char* arr_name){
-  a->attr.attribute_name=strdup(arr_name);
-  a->des=des;
+void Init_AggFun(AggFun * a, DescribeFun des, const char* arr_name){
+  a->attr.attribute_name = strdup(arr_name);
+  a->des = des;
 }
+
+void Init_AggFun_Rel(AggFun *a, DescribeFun des, const char* rel_name, const char* arr_name) {
+  a->attr.relation_name = strdup(rel_name);
+  a->attr.attribute_name = strdup(arr_name);
+  a->des = des;
+}
+
 void selects_append_conditions(Selects *selects, Condition conditions[], size_t condition_num)
 {
   assert(condition_num <= sizeof(selects->conditions) / sizeof(selects->conditions[0]));

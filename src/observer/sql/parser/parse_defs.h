@@ -236,7 +236,8 @@ void condition_destroy(Condition *condition);
 void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, size_t length);
 void attr_info_destroy(AttrInfo *attr_info);
 
-void Init_AggFun(AggFun * a,DescribeFun des,const char* arr_name);
+void Init_AggFun(AggFun * a, DescribeFun des, const char* arr_name);
+void Init_AggFun_Rel(AggFun *a, DescribeFun des, const char* rel_name, const char* arr_name);
 
 void selects_init(Selects *selects, ...);
 void selects_append_aggfun(Selects *selects, AggFun * a);
