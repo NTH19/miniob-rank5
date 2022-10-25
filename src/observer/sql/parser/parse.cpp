@@ -282,7 +282,6 @@ void updates_init(Updates *updates, const char *relation_name, Condition conditi
 
 void updates_destroy(Updates *updates)
 {
-  sizeof(Updates);
   free(updates->relation_name);
   updates->relation_name = nullptr;
   
@@ -336,9 +335,10 @@ void drop_table_destroy(DropTable *drop_table)
   drop_table->relation_name = nullptr;
 }
 
-void create_index_init(
-    CreateIndex *create_index, const char *index_name, const char *relation_name)
+void create_index_init(CreateIndex *create_index, const char *index_name, 
+                        const char *relation_name, int unique)
 {
+  create_index->unique = unique;
   create_index->index_name = strdup(index_name);
   create_index->relation_name = strdup(relation_name);
 }
