@@ -16,6 +16,7 @@ See the Mulan PSL v2 for more details. */
 #define __OBSERVER_STORAGE_COMMON_TABLE_H__
 
 #include "storage/common/table_meta.h"
+#define __NULL_DATA__ "$n\0"  //define for null flag
 
 struct RID;
 class Record;

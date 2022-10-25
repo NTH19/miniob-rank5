@@ -417,12 +417,12 @@ RC Table::insert_records(Trx *trx, int record_num,int value_num, const Value val
     for (int i = 0; i < value_num; i++) {
       const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
       const Value &value = valuesc[i];
-      if (value.type == UNDEFINED) {
+      if (value.type == UNDEFINED &&  !(value._is_null == true && field->nullable() == true)) {// value maybe null 
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
       // multiple update should check type
       if (record_num > 1) { 
-        if (field->type() != value.type && !(TEXTS == field->type() && CHARS == value.type)) {
+        if (field->type() != value.type && !(TEXTS == field->type() && CHARS == value.type) &&!(value._is_null == true && field->nullable() == true)) {
           return RC::SCHEMA_FIELD_TYPE_MISMATCH;
         }
       }
@@ -559,6 +559,10 @@ RC Table::make_record(int value_num, const Value *values, char *&record_out)
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value &value = values[i];
+    if (value._is_null) {
+      memcpy(record + field->offset(), __NULL_DATA__, field->len());
+      continue;           
+    }
     switch (field->type()) {
     case CHARS:
       rc = cast_to_char(*field, value, record);

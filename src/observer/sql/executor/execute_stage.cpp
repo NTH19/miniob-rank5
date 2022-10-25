@@ -301,8 +301,11 @@ void tuple_to_string(std::ostream &os, const Tuple &tuple)
     } else {
       first_field = false;
     }
-
-    cell.to_string(os);
+    // judge null value
+    if (strcmp((char*)(cell.data()), __NULL_DATA__) == 0) {
+      os <<  "NULL";
+    }
+    else cell.to_string(os);
   }
 }
 
@@ -374,6 +377,8 @@ IndexScanOperator *try_to_create_index_scan_operator(FilterStmt *filter_stmt)
       case GREAT_THAN: {
         comp = LESS_EQUAL;
       } break;
+      case COMP_IS_NOT:
+      case COMP_IS:
       default: {
         LOG_WARN("should not happen");
       }
@@ -441,11 +446,12 @@ IndexScanOperator *try_to_create_index_scan_operator(FilterStmt *filter_stmt)
   LOG_INFO("use index for scan: %s in table %s", index->index_meta().name(), table->name());
   return oper;
 }
-void do_aggfun(std::vector<int> &ret, std::vector<int> &char_len, const Tuple &tuple,
+void do_aggfun(std::vector<std::pair<int,int>> &ret, std::vector<int> &char_len, const Tuple &tuple,
     const std::vector<std::pair<DescribeFun, Field>> &funs)
 {
   TupleCell cell;
   RC rc = RC::SUCCESS;
+  bool flag=1;
   for (int i = 0; i < tuple.cell_num(); i++) {
     rc = tuple.cell_at(i, cell);
     if (rc != RC::SUCCESS) {
@@ -454,63 +460,69 @@ void do_aggfun(std::vector<int> &ret, std::vector<int> &char_len, const Tuple &t
     }
     cell.do_aggfun(ret[i], funs[i].first, char_len[i]);
   }
+  return ;
 }
-void gen_result(std::vector<int> &ret, const std::vector<std::pair<DescribeFun, Field>> &funs, std::ostream &os,
+void gen_result(std::vector<std::pair<int,int>> &ret, const std::vector<std::pair<DescribeFun, Field>> &funs, std::ostream &os,
     int cnt, std::vector<int> &char_len)
 {
   bool is_first = true;
   for (int i = 0; i < ret.size(); ++i) {
+    if(ret[i].second==0&&funs[i].first!=COUNT&&funs[i].first == COUNT_STAR){
+      os<<"null";
+      continue;
+    }
     if (is_first) {
       is_first = false;
     } else
       os << " | ";
     if (funs[i].first == AVG) {
-      os << (float)ret[i] / cnt;
+      os << static_cast<float>( ret[i].first)/ ret[i].second;
       continue;
     }
     if (funs[i].first == COUNT || funs[i].first == COUNT_STAR) {
-      os << cnt;
+      os << ret[i].second;
       continue;
     }
     switch (funs[i].second.attr_type()) {
       case FLOATS:
-        os << *(float *)&ret[i];
+        os << *(float *)&ret[i].first;
         break;
       case INTS:
-        os << ret[i];
+        os << ret[i].first;
         break;
       case CHARS:
-        os << std::string((char *)&ret[i], char_len[i]);
+        os << std::string((char *)&ret[i].first, char_len[i]);
         break;
     }
   }
   os << "\n";
 }
 void init_ret_aggfun(
-    std::vector<int> &ret, const std::vector<std::pair<DescribeFun, Field>> &funs, std::vector<int> &char_len)
+    std::vector<std::pair<int,int>> &ret, const std::vector<std::pair<DescribeFun, Field>> &funs, std::vector<int> &char_len)
 {
   int n = ret.size();
   for (int i = 0; i < n; ++i) {
+    ret[i].second=0;
     if (funs[i].first == MIN) {
       if (funs[i].second.attr_type() == CHARS) {
-        memset(&ret[i], 127, 4);
+        memset(&ret[i].first, 127, 4);
         char_len[i] = 3;
       } else if (funs[i].second.attr_type() == FLOATS) {
-        *(float *)&ret[i] = 99999999;
+        *(float *)&ret[i].first = 99999999;
       } else if (funs[i].second.attr_type() == INTS) {
-        ret[i] = INT32_MAX;
+        ret[i].first= INT32_MAX;
       }
     } else if (funs[i].first == MAX) {
       if (funs[i].second.attr_type() == CHARS) {
-        memset(&ret[i], 0, 4);
+        memset(&ret[i].first, 0, 4);
         char_len[i] = 3;
       } else if (funs[i].second.attr_type() == FLOATS) {
-        *(float *)&ret[i] = 0;
+        *(float *)&ret[i] .first= 0;
       } else if (funs[i].second.attr_type() == INTS) {
-        ret[i] = -100000;
+        ret[i].first = -100000;
       }
     } else if (funs[i].first == SUM || funs[i].first == AVG) {
-      ret[i] = 0;
+      ret[i].first = 0;
     }
   }
 }
@@ -583,25 +595,83 @@ std::map<std::string,ProjectOperator*>&tableToProject,FilterStmt* filter,bool ne
         if(r->get_value(*tuple, right_cell)==RC::NOTFOUND)continue;
         const int compare = left_cell.compare(right_cell);
         bool filter_result;
-        switch (cmp) {
-          case EQUAL_TO: {
-            filter_result = (0 == compare); 
-          } break;
-          case LESS_EQUAL: {
-            filter_result = (compare <= 0); 
-          } break;
-          case NOT_EQUAL: {
-            filter_result = (compare != 0);
-          } break;
-          case LESS_THAN: {
-            filter_result = (compare < 0);
-          } break;
-          case GREAT_EQUAL: {
-          filter_result = (compare >= 0);
-          } break;
-          case GREAT_THAN: {
-            filter_result = (compare > 0);
-          } break;
+        if (left_cell.data()==nullptr||right_cell.data()==nullptr){
+      switch (cmp) {
+    case EQUAL_TO: 
+    case LESS_EQUAL: 
+    case NOT_EQUAL: 
+    case LESS_THAN:
+    case GREAT_EQUAL: 
+    case GREAT_THAN: {
+      filter_result = 0;
+    } break;
+    case LIKE_TO: {
+      filter_result = left_cell.like(right_cell);
+    } break;
+    case NOT_LIKE: {
+      filter_result = !left_cell.like(right_cell);
+    } break;
+    case COMP_IS_NOT:{
+      if ((left_cell.data()!=nullptr&&(!(memcmp((void*)left_cell.data(),__NULL_DATA__,4))&&right_cell.data()==nullptr)) ||  
+      ((right_cell.data()!=nullptr&&!(memcmp((void*)right_cell.data(),__NULL_DATA__,4))&&left_cell.data()==nullptr))) filter_result =0;
+      else {
+          filter_result =1;
+      }
+    }break;
+    case COMP_IS: {
+    if ((left_cell.data()!=nullptr&&(!(memcmp((void*)left_cell.data(),__NULL_DATA__,4))&&right_cell.data()==nullptr)) ||  
+      ((right_cell.data()!=nullptr&&!(memcmp((void*)right_cell.data(),__NULL_DATA__,4))&&left_cell.data()==nullptr))) filter_result =1;
+    else {
+          filter_result =0;
+      }
+    }break;
+    default: {
+      // LOG_WARN("invalid compare type: %d", comp);
+    } break;
+    }
+    }
+    else {
+    switch (cmp) {
+    case EQUAL_TO: {
+      filter_result = (0 == compare); 
+    } break;
+    case LESS_EQUAL: {
+      filter_result = (compare <= 0); 
+    } break;
+    case NOT_EQUAL: {
+      filter_result = (compare != 0);
+    } break;
+    case LESS_THAN: {
+      filter_result = (compare < 0);
+    } break;
+    case GREAT_EQUAL: {
+      filter_result = (compare >= 0);
+    } break;
+    case GREAT_THAN: {
+      filter_result = (compare > 0);
+    } break;
+    case LIKE_TO: {
+      filter_result = left_cell.like(right_cell);
+    } break;
+    case NOT_LIKE: {
+      filter_result = !left_cell.like(right_cell);
+    } break;
+    case COMP_IS_NOT:{
+      if (left_cell.data()==nullptr&&right_cell.data()==nullptr) filter_result =0;
+      else {
+          filter_result =1;
+      }
+    }break;
+    case COMP_IS: {
+    if (left_cell.data()==nullptr&&right_cell.data()==nullptr) filter_result =1;
+    else {
+          filter_result =0;
+      }
+    }break;
+    default: {
+      // LOG_WARN("invalid compare type: %d", comp);
+    } break;
+      }
         }
         canAdd=filter_result;
       }else canAdd=true;
@@ -694,7 +764,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     }
     std::stringstream ss;
     print_aggfun_header(ss, funs);
-    std::vector<int> ret(funs.size(), 0);
+    std::vector<std::pair<int,int>> ret(funs.size());
     std::vector<int> char_len(funs.size(), 0);
     init_ret_aggfun(ret, funs, char_len);
     int cnt = 0;
@@ -707,8 +777,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
         LOG_WARN("failed to get current record. rc=%s", strrc(rc));
         break;
       }
-      do_aggfun(ret, char_len, *tuple, funs);
-      cnt++;
+    do_aggfun(ret, char_len, *tuple, funs);
     }
 
     if (rc != RC::RECORD_EOF) {
@@ -723,14 +792,15 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     return rc;
   }
 
-  // check whether is valid (maybe just for date)
+  // check whether is valid (maybe just for date && null == nullptr)
   for (const FilterUnit *filter_unit : select_stmt->filter_stmt()->filter_units()) {
     TupleCell cell;
     RowTuple t;
     if (dynamic_cast<ValueExpr *>(filter_unit->left())) {
       filter_unit->left()->get_value(t, cell);
       auto p = cell.data();
-      if (p == nullptr) {
+       auto thistype= cell.attr_type();
+      if (p == nullptr&& thistype==DATES) {
         session_event->set_response("FAILURE\n");
         return RC::INVALID_ARGUMENT;
       }
@@ -738,7 +808,8 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     if (dynamic_cast<ValueExpr *>(filter_unit->right())) {
       filter_unit->right()->get_value(t, cell);
       auto p = cell.data();
-      if (p == nullptr) {
+      auto thistype= cell.attr_type();
+      if (p == nullptr&& thistype==DATES) {
         session_event->set_response("FAILURE\n");
         return RC::INVALID_ARGUMENT;
       }
@@ -935,7 +1006,7 @@ RC ExecuteStage::do_insert(SQLStageEvent *sql_event)
     const Value *v = insert_stmt->values_[k];
     for (int i = 0; i < insert_stmt->value_amount(); i++) {
       const Value *vm = v + i;
-      if (vm->data == nullptr) {
+      if (vm->data == nullptr&&(vm->_is_null!=1)) {
         session_event->set_response("FAILURE\n");
         return RC::INVALID_ARGUMENT;
       }

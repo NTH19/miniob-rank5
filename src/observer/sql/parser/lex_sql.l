@@ -83,8 +83,8 @@ DOUBLE_QUOTE     [\"]
 [Nn][Oo][Tt]                                         RETURN_TOKEN(NOT);
 [Ll][Ii][Kk][Ee]                                     RETURN_TOKEN(LIKE);
 [Ii][Ss]								                             RETURN_TOKEN(IS);
-[Nn][Uu][Ll][Ll][Aa][Bb][Ll][Ee]		                 RETURN_TOKEN(NULLABLE);
 [Nn][Uu][Ll][Ll]						                         RETURN_TOKEN(NULLL);
+[Nn][Uu][Ll][Ll][Aa][Bb][Ll][Ee]		                 RETURN_TOKEN(NULLABLE);
 {ID}                                                 yylval->string=strdup(yytext); RETURN_TOKEN(ID);
 "("                                                  RETURN_TOKEN(LBRACE);
 ")"                                                  RETURN_TOKEN(RBRACE);

@@ -20,7 +20,7 @@ See the Mulan PSL v2 for more details. */
 #include "util/comparator.h"
 #include "util/util.h"
 
-void TupleCell::to_string(std::ostream &os) const//only text need thistable
+void TupleCell::to_string(std::ostream &os) const
 {
   switch (attr_type_) {
   case INTS: {
@@ -56,14 +56,15 @@ void memcp_for_max(void* dst,void* cmp,int accro){
 void memcp_for_min(void* dst,void* cmp,int accro){
   if(accro<0)memcpy(dst,cmp,4);
 }
-void TupleCell::do_aggfun(int &ret,DescribeFun des,int& char_len)const {
+void TupleCell::do_aggfun(std::pair<int,int>&ret,DescribeFun des,int& char_len)const {
   int res=0;
-  if(des==COUNT)return;
+  if (check_null()) return;
+  ret.second++;
   switch (this->attr_type_) {
-  case INTS: res= compare_int(this->data_, (void*)&ret);break;
-  case FLOATS: res= compare_float(this->data_, (void*)&ret);break;
-  case DATES: res= compare_int(this->data_, (void*)&ret);break;
-  case CHARS: res=compare_string(this->data_, this->length_, (void*)&ret,char_len);
+  case INTS: res= compare_int(this->data_, (void*)&ret.first);break;
+  case FLOATS: res= compare_float(this->data_, (void*)&ret.first);break;
+  case DATES: res= compare_int(this->data_, (void*)&ret.first);break;
+  case CHARS: res=compare_string(this->data_, this->length_, (void*)&ret.first,char_len);
   break;
   }
   //to do :reduce the code
@@ -71,31 +72,32 @@ void TupleCell::do_aggfun(int &ret,DescribeFun des,int& char_len)const {
     switch (des)
     {
     case MAX:
-      ret=res>0?*(int*)this->data_:ret;
-      char_len=ret==*(int*)this->data_?this->length_:char_len;
+      ret.first=res>0?*(int*)this->data_:ret.first;
+      char_len=ret.first==*(int*)this->data_?this->length_:char_len;
       break;
     case MIN:
-      ret=res<0?*(int*)this->data_:ret;
-      char_len=ret==*(int*)this->data_?this->length_:char_len;
+      ret.first=res<0?*(int*)this->data_:ret.first;
+      char_len=ret.first==*(int*)this->data_?this->length_:char_len;
       break;
     }
-    return;
+    return ;
   }
   switch (des)
   {
   case MAX:
-    memcp_for_max(&ret,this->data_,res);
+    memcp_for_max(&ret.first,this->data_,res);
     break;
   case MIN:
-    memcp_for_min(&ret,this->data_,res);
+    memcp_for_min(&ret.first,this->data_,res);
     break;
   case AVG:
-    *(float*)&ret+=*(float*)this->data_;
+    *(float*)&ret.first+=*(float*)this->data_;
     break;
   case SUM:
-    ret+=*(int*)this->data_;
+    ret.first+=*(int*)this->data_;
     break;
   }
+  return ;
 }
 int TupleCell::compare(const TupleCell &other) const
 {
@@ -134,7 +136,6 @@ int TupleCell::compare(const TupleCell &other) const
     float val = atof(num.c_str());
     return compare_float(this->data_, &val);
   } 
-
 
   LOG_WARN("not supported");
   return -1; // TODO return rc?
