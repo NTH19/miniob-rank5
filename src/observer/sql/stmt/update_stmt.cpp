@@ -55,7 +55,7 @@ RC UpdateStmt::create(Db *db, const Updates &update, Stmt *&stmt)
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
     if(attr.value.type != UNDEFINED) {
-      if (field->type() != attr.value.type && !(field->type() == TEXTS && attr.value.type == CHARS)) {
+      if (update.attr_num == 1 && field->type() != attr.value.type && !(field->type() == TEXTS && attr.value.type == CHARS)) {
         LOG_WARN("field type not match. field=%s.%s.%s", db->name(), table->name(), attr.attribute_name);
         for(auto &attr : update_attrs) {
           delete attr.select_stmt_;

@@ -39,12 +39,22 @@ RC UpdateOperator::open()
       int record_data_size = field_meta->len();
       const Value &value = attr.value_ == nullptr ? attr.selected_values[0] : *attr.value_;
       const char *value_data = static_cast<char *>(value.data);
-      if (field_meta->type() == CHARS) {
-        size_t value_len = strlen(value_data) + 1;
-        record_data_size = std::min(record_data_size, static_cast<int>(value_len));
+
+      switch (field_meta->type()) {
+      case CHARS:
         memset(new_record_data + field_meta->offset(), 0, field_meta->len());
+        rc = table->cast_to_char(*field_meta, value, new_record_data);
+        break;
+      case INTS:
+        rc = table->cast_to_int(*field_meta, value, new_record_data);
+        break;
+      case FLOATS:
+        rc = table->cast_to_float(*field_meta, value, new_record_data);
+        break;
+      case DATES:
         memcpy(new_record_data + field_meta->offset(), value_data, record_data_size);
-      } else if (field_meta->type() == TEXTS) {
+        break;
+      case TEXTS: {
         char *s;
         if (strlen(value_data) > 4096) {
           s = (char*)malloc(4097);
@@ -56,10 +66,18 @@ RC UpdateOperator::open()
         }
         int result = update_stmt_->table()->insert_text(s);
         memcpy(new_record_data + field_meta->offset(), &result, field_meta->len());
-      } else {
-        memcpy(new_record_data + field_meta->offset(), value_data, record_data_size);
+        break;
+      }
+      default:
+        rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
+        break;
+      }
+
+      if (rc != RC::SUCCESS) {
+        LOG_PANIC("cast error during update");
       }
     }
+    
     rc = table->update_record(trx_, &record, new_record_data);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to update record: %s", strrc(rc));
