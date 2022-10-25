@@ -97,7 +97,9 @@ RC Trx::update_record(Table *table, Record *record) {
   // 先校验是否以前是否存在过(应该不会存在) 
   Operation *old_oper = find_operation(table, record->rid());
   if (old_oper != nullptr) {
-    return RC::GENERIC_ERROR; // error code
+    if (old_oper->type() == Operation::Type::DELETE) {
+      return RC::GENERIC_ERROR;
+    }
   }
 
   start_if_not_started();

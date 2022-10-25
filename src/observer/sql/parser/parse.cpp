@@ -148,10 +148,17 @@ void selects_append_aggfun(Selects *selects, AggFun * a)
 {
   selects->aggFun[selects->aggfun_num++]=*a;
 }
-void Init_AggFun(AggFun * a,DescribeFun des,const char* arr_name){
-  a->attr.attribute_name=strdup(arr_name);
-  a->des=des;
+void Init_AggFun(AggFun * a, DescribeFun des, const char* arr_name){
+  a->attr.attribute_name = strdup(arr_name);
+  a->des = des;
 }
+
+void Init_AggFun_Rel(AggFun *a, DescribeFun des, const char* rel_name, const char* arr_name) {
+  a->attr.relation_name = strdup(rel_name);
+  a->attr.attribute_name = strdup(arr_name);
+  a->des = des;
+}
+
 void selects_append_conditions(Selects *selects, Condition conditions[], size_t condition_num)
 {
   assert(condition_num <= sizeof(selects->conditions) / sizeof(selects->conditions[0]));
@@ -178,6 +185,11 @@ void selects_destroy(Selects *selects)
     condition_destroy(&selects->conditions[i]);
   }
   selects->condition_num = 0;
+
+  for(size_t i = 0; i < selects->aggfun_num; i++) {
+    relation_attr_destroy(&selects->aggFun[i].attr);
+  }
+  selects->aggfun_num = 0;
 }
 
 void inserts_init(Inserts *inserts, const char *relation_name, Value values[], size_t value_num,size_t single_record_length[], size_t record_num)
@@ -238,12 +250,34 @@ void deletes_destroy(Deletes *deletes)
   deletes->relation_name = nullptr;
 }
 
-void updates_init(Updates *updates, const char *relation_name, const char *attribute_name, Value *value,
-    Condition conditions[], size_t condition_num)
+void updates_selects_append_attribute(Updates *updates, RelAttr *rel_attr) {
+  selects_append_attribute(&updates->update_attrs[updates->attr_num].select, rel_attr);
+}
+
+void updates_selects_append_aggfun(Updates *updates, AggFun * a) {
+  selects_append_aggfun(&updates->update_attrs[updates->attr_num].select, a);
+}
+
+void updates_selects_append_conditions(Updates *updates, Condition conditions[], size_t condition_num) {
+  selects_append_conditions(&updates->update_attrs[updates->attr_num].select, conditions, condition_num);
+}
+
+void updates_selects_append_relation(Updates *updates, const char *relation_name) {
+  selects_append_relation(&updates->update_attrs[updates->attr_num].select, relation_name);
+}
+
+void updates_append_value(Updates *updates, Value *value) {
+  updates->update_attrs[updates->attr_num].value = *value;
+}
+
+void updates_append_attr(Updates *updates, const char *attr_name) {
+  updates->update_attrs[updates->attr_num].attribute_name = strdup(attr_name);
+  updates->attr_num ++;
+}
+
+void updates_init(Updates *updates, const char *relation_name, Condition conditions[], size_t condition_num)
 {
   updates->relation_name = strdup(relation_name);
-  updates->attribute_name = strdup(attribute_name);
-  updates->value = *value;
 
   assert(condition_num <= sizeof(updates->conditions) / sizeof(updates->conditions[0]));
   for (size_t i = 0; i < condition_num; i++) {
@@ -254,12 +288,17 @@ void updates_init(Updates *updates, const char *relation_name, const char *attri
 
 void updates_destroy(Updates *updates)
 {
+  sizeof(Updates);
   free(updates->relation_name);
-  free(updates->attribute_name);
   updates->relation_name = nullptr;
-  updates->attribute_name = nullptr;
-
-  value_destroy(&updates->value);
+  
+  for (size_t i = 0; i < updates->attr_num; i++) {
+    free(updates->update_attrs[i].attribute_name);
+    updates->update_attrs[i].attribute_name = nullptr;
+    value_destroy(&updates->update_attrs[i].value);
+    selects_destroy(&updates->update_attrs[i].select);
+  }
+  updates->attr_num = 0;
 
   for (size_t i = 0; i < updates->condition_num; i++) {
     condition_destroy(&updates->conditions[i]);

@@ -477,6 +477,7 @@ void gen_result(std::vector<std::pair<int, int>> &ret, const std::vector<std::pa
       os << " | ";
     if (funs[i].first == AVG) {
       os << static_cast<float>(ret[i].first) / ret[i].second;
+
       continue;
     }
     if (funs[i].first == COUNT || funs[i].first == COUNT_STAR) {
@@ -1120,17 +1121,174 @@ RC ExecuteStage::do_insert(SQLStageEvent *sql_event)
   }
   return rc;
 }
+
+void agg_result(std::vector<std::pair<int,int>> &ret, const std::vector<std::pair<DescribeFun, Field>> &funs, 
+ std::vector<int> &char_len, std::vector<Value> &out_value) {
+  out_value.reserve(ret.size());
+
+  for (int i = 0; i < ret.size(); ++i) {
+    Value value;
+    switch (funs[i].first) {
+    case COUNT:
+    case COUNT_STAR:
+      value.type = INTS;
+      value.data = new int(ret[i].second);
+      break;
+    case AVG:
+      value.type = FLOATS;
+      value.data = new float((*(float *)&ret[i].first) / ret[i].first);
+      break;
+    default:
+      switch (funs[i].second.attr_type()) {
+      case FLOATS:
+        value.type = FLOATS;
+        value.data = new float(*(float *)&ret[i].first);
+        break;
+      case INTS:
+        value.type = INTS;
+        value.data = new int(ret[i].first);
+        break;
+      case CHARS:
+        value.type = CHARS;
+        char *str = new char[char_len[i] + 1];
+        memcpy(str, (char *)&ret[i].first, char_len[i]);
+        str[char_len[i] + 1] = 0;
+        value.data = str;
+        break;
+      }
+      break;
+    }
+    out_value.push_back(value);
+  }
+}
+
+RC do_update_select(SelectStmt *select_stmt, SessionEvent *session_event, std::vector<Value> &out_value) {
+  RC rc = RC::SUCCESS;
+  // agg fun happens here
+  if (select_stmt->funs().size() != 0) {
+    auto funs = select_stmt->funs();
+    if (funs.size() != 1) {
+      return RC::INVALID_ARGUMENT;
+    }
+    Operator *scan_oper = new TableScanOperator(select_stmt->tables()[0]);
+    DEFER([&]() { delete scan_oper; });
+    PredicateOperator pred_oper(select_stmt->filter_stmt());
+    pred_oper.add_child(scan_oper);
+    ProjectOperator project_oper;
+    project_oper.add_child(&pred_oper);
+    for (int i = 0; i < funs.size(); ++i) {
+      project_oper.add_projection(funs[i].second.table(), funs[i].second.meta());
+    }
+    rc = project_oper.open();
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to open operator");
+      return rc;
+    }
+
+    std::vector<std::pair<int,int>> ret(funs.size());
+    std::vector<int> char_len(funs.size(), 0);
+    init_ret_aggfun(ret, funs, char_len);
+    int cnt = 0;
+    while ((rc = project_oper.next()) == RC::SUCCESS) {
+      // get current record
+      // write to response
+      Tuple *tuple = project_oper.current_tuple();
+      if (nullptr == tuple) {
+        rc = RC::INTERNAL;
+        LOG_WARN("failed to get current record. rc=%s", strrc(rc));
+        break;
+      }
+      do_aggfun(ret, char_len, *tuple, funs);
+    }
+
+    if (rc != RC::RECORD_EOF) {
+      LOG_WARN("something wrong while iterate operator. rc=%s", strrc(rc));
+      project_oper.close();
+    } else {
+      rc = project_oper.close();
+    }
+    agg_result(ret, funs, char_len, out_value);
+    return rc;
+  }
+
+  Operator *scan_oper = new TableScanOperator(select_stmt->tables()[0]);
+  DEFER([&]() { delete scan_oper; });
+
+  PredicateOperator pred_oper(select_stmt->filter_stmt());
+  pred_oper.add_child(scan_oper);
+  ProjectOperator project_oper;
+  project_oper.add_child(&pred_oper);
+  for (const Field &field : select_stmt->query_fields()) {
+    project_oper.add_projection(field.table(), field.meta());
+  }
+  rc = project_oper.open();
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to open operator");
+    return rc;
+  }
+
+  Table * thistable = select_stmt->tables()[0];
+  while ((rc = project_oper.next()) == RC::SUCCESS) {
+    // get current record
+    // write to response
+    Tuple *tuple = project_oper.current_tuple();
+    if (nullptr == tuple) {
+      rc = RC::INTERNAL;
+      LOG_WARN("failed to get current record. rc=%s", strrc(rc));
+      break;
+    }
+
+    TupleCell cell;
+    for (int i = 0; i < tuple->cell_num(); i++) {
+      rc = tuple->cell_at(i, cell);
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("failed to fetch field of cell. index=%d, rc=%s", i, strrc(rc));
+        break;
+      }
+      Value value;
+      value.type = cell.attr_type();
+      char *str = new char[cell.length() + 1];
+      memcpy(str, cell.data(), cell.length());
+      str[cell.length() + 1] = 0;
+      value.data = str;
+      out_value.push_back(value);
+    }
+  }
+
+  if (rc != RC::RECORD_EOF) {
+    LOG_WARN("something wrong while iterate operator. rc=%s", strrc(rc));
+    project_oper.close();
+  } else {
+    rc = project_oper.close();
+  }
+  return rc;
+}
+
 RC ExecuteStage::do_update(UpdateStmt *update_stmt, SessionEvent *session_event)
 {
-  if (update_stmt == nullptr) {
-    LOG_WARN("cannot find statement");
-    return RC::GENERIC_ERROR;
-  }
   RC rc = RC::SUCCESS;
   Session *session = session_event->session();
   Db *db = session->get_current_db();
   Trx *trx = session->current_trx();
   CLogManager *clog_manager = db->get_clog_manager();
+
+  std::vector<UpdateAttrInfo> &update_attr = update_stmt->attrs();
+  for(UpdateAttrInfo &attr : update_attr) {
+    if(attr.value_ == nullptr) {
+      RC rc2 = do_update_select(attr.select_stmt_, session_event, attr.selected_values);
+      if (rc2 != SUCCESS) {
+        LOG_ERROR("error occured during update-select: %s", strrc(rc2));
+        session_event->set_response("FAILURE\n");
+        return rc2;
+      }
+      if (attr.selected_values.size() != 1) {
+        LOG_WARN("selected value num not equal 1 in update");
+        session_event->set_response("FAILURE\n");
+        return RC::INVALID_ARGUMENT;
+      }
+    }
+  }
+
   TableScanOperator scan_oper(update_stmt->table());
   PredicateOperator pred_oper(update_stmt->filter_stmt());
   pred_oper.add_child(&scan_oper);

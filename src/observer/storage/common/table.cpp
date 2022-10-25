@@ -459,9 +459,14 @@ const TableMeta &Table::table_meta() const
 
 RC Table::cast_to_char(const FieldMeta &field, const Value &src_value, char *record) 
 {
+  if (field.nullable()&&src_value._is_null){
+      memcpy(record + field.offset(), __NULL_DATA__, 4);
+      return RC::SUCCESS;
+  }
   switch (src_value.type)
   {
   case CHARS: {
+    
     size_t copy_len = std::min(static_cast<size_t>(field.len()), 
                               strlen(static_cast<const char *>(src_value.data)) + 1);
     memcpy(record + field.offset(), src_value.data, copy_len);
@@ -490,6 +495,10 @@ RC Table::cast_to_char(const FieldMeta &field, const Value &src_value, char *rec
 
 RC Table::cast_to_int(const FieldMeta &field, const Value &src_value, char *record) 
 {
+  if (field.nullable()&&src_value._is_null){
+      memcpy(record + field.offset(), __NULL_DATA__, 4);
+      return RC::SUCCESS;
+  }
   switch (src_value.type)
   {
   case CHARS: {
@@ -517,6 +526,10 @@ RC Table::cast_to_int(const FieldMeta &field, const Value &src_value, char *reco
 
 RC Table::cast_to_float(const FieldMeta &field, const Value &src_value, char *record) 
 {
+  if (field.nullable()&&src_value._is_null){
+      memcpy(record + field.offset(), __NULL_DATA__, 4);
+      return RC::SUCCESS;
+  }
   switch (src_value.type)
   {
   case CHARS: {

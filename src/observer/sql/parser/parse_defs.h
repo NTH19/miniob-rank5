@@ -115,11 +115,17 @@ typedef struct {
   Condition conditions[MAX_NUM];  // conditions in Where clause
 } Deletes;
 
+typedef struct {
+  char *attribute_name; // Attribute to update
+  Value value;          // update value
+  Selects select;       // update select
+} UpdateAttr;
+
 // struct of update
 typedef struct {
   char *relation_name;            // Relation to update
-  char *attribute_name;           // Attribute to update
-  Value value;                    // update value
+  UpdateAttr update_attrs[10];
+  size_t attr_num;
   size_t condition_num;           // Length of conditions in Where clause
   Condition conditions[MAX_NUM];  // conditions in Where clause
 } Updates;
@@ -236,7 +242,11 @@ void condition_destroy(Condition *condition);
 void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, size_t length, int nullable);
 void attr_info_destroy(AttrInfo *attr_info);
 
+void Init_AggFun(AggFun * a, DescribeFun des, const char* arr_name);
+void Init_AggFun_Rel(AggFun *a, DescribeFun des, const char* rel_name, const char* arr_name);
+
 void selects_init(Selects *selects, ...);
+void selects_append_aggfun(Selects *selects, AggFun * a);
 void selects_append_attribute(Selects *selects, RelAttr *rel_attr);
 void selects_append_relation(Selects *selects, const char *relation_name);
 void selects_append_conditions(Selects *selects, Condition conditions[], size_t condition_num);
@@ -249,8 +259,13 @@ void deletes_init_relation(Deletes *deletes, const char *relation_name);
 void deletes_set_conditions(Deletes *deletes, Condition conditions[], size_t condition_num);
 void deletes_destroy(Deletes *deletes);
 
-void updates_init(Updates *updates, const char *relation_name, const char *attribute_name, Value *value,
-    Condition conditions[], size_t condition_num);
+void updates_selects_append_attribute(Updates *updates, RelAttr *rel_attr);
+void updates_selects_append_aggfun(Updates *updates, AggFun * a);
+void updates_selects_append_conditions(Updates *updates, Condition conditions[], size_t condition_num);
+void updates_selects_append_relation(Updates *updates, const char *relation_name);
+void updates_append_value(Updates *updates, Value *value);
+void updates_append_attr(Updates *updates, const char *attr_name);
+void updates_init(Updates *updates, const char *relation_name, Condition conditions[], size_t condition_num);
 void updates_destroy(Updates *updates);
 
 void create_table_append_attribute(CreateTable *create_table, AttrInfo *attr_info);

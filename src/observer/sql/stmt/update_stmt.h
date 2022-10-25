@@ -16,16 +16,29 @@ See the Mulan PSL v2 for more details. */
 
 #include "rc.h"
 #include "sql/stmt/stmt.h"
+#include "sql/stmt/select_stmt.h"
 #include "storage/common/field_meta.h"
 
 class Table;
 class FilterStmt;
+
+class UpdateAttrInfo {
+public:
+  UpdateAttrInfo() = default;
+  UpdateAttrInfo(const FieldMeta *field, const Value *value, SelectStmt *select_stmt) :
+    field_(field), value_(value), select_stmt_(select_stmt)
+    {}
+  const FieldMeta *field_ = nullptr;
+  const Value *value_ = nullptr;      // raw value from update sentence
+  SelectStmt *select_stmt_ = nullptr;
+  std::vector<Value> selected_values; // selected_values
+};
+
 class UpdateStmt : public Stmt
 {
 public:
 
   UpdateStmt() = default;
-  UpdateStmt(Table *table, const Value* values, int value_amount, FilterStmt * filter_stmt, const FieldMeta *field);
   ~UpdateStmt() override;
 
 public:
@@ -33,17 +46,14 @@ public:
 
 public:
   Table *table() const {return table_;}
-  const Value* values() const { return values_; }
-  int value_amount() const { return value_amount_; }
+  int attr_num() const { return update_attrs_.size(); }
+  std::vector<UpdateAttrInfo> &attrs(){ return update_attrs_; };
   FilterStmt *filter_stmt() const { return filter_stmt_; }
   StmtType type() const override { return StmtType::UPDATE; }
-  const FieldMeta *field() const { return field_; };
 
 private:
   Table *table_ = nullptr;
-  const Value* values_ ;
-  int value_amount_ = 0;
   FilterStmt *filter_stmt_ = nullptr;
-  const FieldMeta *field_ = nullptr;
+  std::vector<UpdateAttrInfo> update_attrs_;
 };
 

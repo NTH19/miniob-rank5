@@ -430,16 +430,125 @@ delete:		/*  delete 语句的语法解析树*/
     }
     ;
 update:			/*  update 语句的语法解析树*/
-    UPDATE ID SET ID EQ value where SEMICOLON
+    UPDATE ID SET update_attr update_attr_list where SEMICOLON
 		{
-			printf("1111111111111111111111");
 			CONTEXT->ssql->flag = SCF_UPDATE;//"update";
-			Value *value = &CONTEXT->values[0];
-			updates_init(&CONTEXT->ssql->sstr.update, $2, $4, value, 
-					CONTEXT->conditions, CONTEXT->condition_length);
+			updates_init(&CONTEXT->ssql->sstr.update, $2, CONTEXT->conditions, CONTEXT->condition_length);
 			CONTEXT->condition_length = 0;
 		}
     ;
+
+update_attr_list:
+	/* empty */
+	| COMMA update_attr update_attr_list
+	;
+
+update_attr:
+	ID EQ value
+		{
+			updates_append_value(&CONTEXT->ssql->sstr.update, &CONTEXT->values[CONTEXT->value_length - 1]);
+			updates_append_attr(&CONTEXT->ssql->sstr.update, $1);
+			CONTEXT->value_length = 0;
+		}
+	| ID EQ LBRACE SELECT update_select_attr FROM ID where RBRACE
+		{
+			updates_selects_append_relation(&CONTEXT->ssql->sstr.update, $7);
+			updates_selects_append_conditions(&CONTEXT->ssql->sstr.update, CONTEXT->conditions, CONTEXT->condition_length);
+			updates_append_attr(&CONTEXT->ssql->sstr.update, $1);
+			CONTEXT->condition_length = 0;
+			CONTEXT->value_length = 0;
+		}
+	| ID EQ LBRACE SELECT update_agg FROM ID where RBRACE
+		{
+			updates_selects_append_relation(&CONTEXT->ssql->sstr.update, $7);
+			updates_selects_append_conditions(&CONTEXT->ssql->sstr.update, CONTEXT->conditions, CONTEXT->condition_length);
+			updates_append_attr(&CONTEXT->ssql->sstr.update, $1);
+			CONTEXT->condition_length = 0;
+			CONTEXT->value_length = 0;
+		}
+	;
+
+update_select_attr:
+    STAR {  
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, "*");
+			updates_selects_append_attribute(&CONTEXT->ssql->sstr.update, &attr);
+		}
+    | ID {
+			RelAttr attr;
+			relation_attr_init(&attr, NULL, $1);
+			updates_selects_append_attribute(&CONTEXT->ssql->sstr.update, &attr);
+		}
+  	| ID DOT ID {
+			RelAttr attr;
+			relation_attr_init(&attr, $1, $3);
+			updates_selects_append_attribute(&CONTEXT->ssql->sstr.update, &attr);
+		}
+	| ID DOT STAR {
+			RelAttr attr;
+			relation_attr_init(&attr, $1, "*");
+			updates_selects_append_attribute(&CONTEXT->ssql->sstr.update, &attr);
+		}
+    ;
+
+update_agg:
+	 COUNT_T LBRACE STAR RBRACE {
+		AggFun aggre;
+		Init_AggFun(&aggre, COUNT_STAR, "*");
+		updates_selects_append_aggfun(&CONTEXT->ssql->sstr.update,  &aggre);
+	}
+	| COUNT_T LBRACE ID RBRACE {
+		AggFun aggre;
+		Init_AggFun(&aggre, COUNT, $3);
+		updates_selects_append_aggfun(&CONTEXT->ssql->sstr.update, &aggre);
+	}
+	| COUNT_T LBRACE ID DOT ID RBRACE {
+		AggFun aggre;
+		Init_AggFun_Rel(&aggre, COUNT, $3, $5);
+		updates_selects_append_aggfun(&CONTEXT->ssql->sstr.update, &aggre);
+	}
+	| MAX_T LBRACE ID RBRACE {
+		AggFun aggre;
+		Init_AggFun(&aggre, MAX, $3);
+		updates_selects_append_aggfun(&CONTEXT->ssql->sstr.update, &aggre);
+	}
+	| MAX_T LBRACE ID DOT ID RBRACE {
+		AggFun aggre;
+		Init_AggFun_Rel(&aggre, MAX, $3, $5);
+		updates_selects_append_aggfun(&CONTEXT->ssql->sstr.update, &aggre);
+	}
+	| MIN_T LBRACE ID RBRACE {
+		AggFun aggre;
+		Init_AggFun(&aggre, MIN, $3);
+		updates_selects_append_aggfun(&CONTEXT->ssql->sstr.update, &aggre);
+	}
+	| MIN_T LBRACE ID DOT ID RBRACE {
+		AggFun aggre;
+		Init_AggFun_Rel(&aggre, MIN, $3, $5);
+		updates_selects_append_aggfun(&CONTEXT->ssql->sstr.update, &aggre);
+	}
+	| SUM_T LBRACE ID RBRACE {
+		AggFun aggre;
+		Init_AggFun(&aggre, SUM, $3);
+		updates_selects_append_aggfun(&CONTEXT->ssql->sstr.update, &aggre);
+	}
+	| SUM_T LBRACE ID DOT ID RBRACE {
+		AggFun aggre;
+		Init_AggFun_Rel(&aggre, SUM, $3, $5);
+		updates_selects_append_aggfun(&CONTEXT->ssql->sstr.update, &aggre);
+	}
+	| AVG_T LBRACE ID RBRACE {
+		AggFun aggre;
+		Init_AggFun(&aggre, AVG, $3);
+		updates_selects_append_aggfun(&CONTEXT->ssql->sstr.update, &aggre);
+	}
+	| AVG_T LBRACE ID DOT ID RBRACE {
+		AggFun aggre;
+		Init_AggFun_Rel(&aggre, AVG, $3, $5);
+		updates_selects_append_aggfun(&CONTEXT->ssql->sstr.update, &aggre);
+	}
+	;
+
 select:				/*  select 语句的语法解析树*/
     SELECT select_attr FROM ID rel_list where SEMICOLON{
 			// CONTEXT->ssql->sstr.selection.relations[CONTEXT->from_length++]=$4;
