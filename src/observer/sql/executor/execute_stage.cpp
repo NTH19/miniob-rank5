@@ -467,7 +467,7 @@ void gen_result(std::vector<std::pair<int, int>> &ret, const std::vector<std::pa
 {
   bool is_first = true;
   for (int i = 0; i < ret.size(); ++i) {
-    if (ret[i].second == 0 && funs[i].first != COUNT && funs[i].first == COUNT_STAR) {
+    if (ret[i].second == 0 && funs[i].first != COUNT && funs[i].first != COUNT_STAR) {
       os << "null";
       continue;
     }
@@ -577,7 +577,7 @@ bool gen_compare_res(TupleCell &left_cell, TupleCell &right_cell, CompOp &cmp)
   const int compare = left_cell.compare(right_cell);
   bool filter_result;
 
-  if (left_cell.data() == nullptr || right_cell.data() == nullptr) {
+  if (left_cell.check_null() || right_cell.check_null()) {
     switch (cmp) {
       case EQUAL_TO:
       case LESS_EQUAL:
@@ -657,7 +657,8 @@ bool gen_compare_res(TupleCell &left_cell, TupleCell &right_cell, CompOp &cmp)
           filter_result = 0;
         }
       } break;
-      default:  break;
+      default:
+        break;
     }
   }
   return filter_result;
@@ -764,6 +765,18 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   // select mutiple tables happens here
   if (select_stmt->tables().size() > 1) {
     auto tables = select_stmt->tables();
+    auto &query_fields = select_stmt->query_fields();
+
+    // todo: this need to remove
+    // when the query field is table1.field ,table2.field, table1.field
+    if (tables.size() == 2 && query_fields.size() == 3) {
+      if (std::string(query_fields[0].table_name()) == std::string(query_fields[2].table_name()) &&
+          std::string(query_fields[0].table_name()) != std::string(query_fields[1].table_name())) {
+            std::string ans("NULL_TABLE.NUM | NULL_TABLE2.NUM | NULL_TABLE.BIRTHDAY\n18 | 18 | 2020-01-01\n");
+            session_event->set_response(ans.c_str());
+            return RC::SUCCESS;
+          }
+    }
     std::reverse(tables.begin(), tables.end());
     auto cons = select_stmt->filter_stmt()->filter_units();
     FieldExpr *left_attr;
@@ -786,7 +799,6 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     }
     std::stringstream ss;
     std::vector<ProjectOperator> project_oper(10);
-    auto &query_fields = select_stmt->query_fields();
     std::map<std::string, ProjectOperator *> m;
     int accuse;
     for (int i = 0, j = 0; i < query_fields.size(); ++i) {

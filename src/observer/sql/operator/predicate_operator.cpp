@@ -99,13 +99,18 @@ bool PredicateOperator::do_predicate(RowTuple &tuple)
     case COMP_IS_NOT:{
       if ((left_cell.data()!=nullptr&&(!(memcmp((void*)left_cell.data(),__NULL_DATA__,4))&&right_cell.data()==nullptr)) ||  
       ((right_cell.data()!=nullptr&&!(memcmp((void*)right_cell.data(),__NULL_DATA__,4))&&left_cell.data()==nullptr))) filter_result =0;
-      else {
+      else if (left_cell.data()==nullptr&&right_cell.data()==nullptr){
+      filter_result=0;
+    }else {
           filter_result =1;
       }
     }break;
     case COMP_IS: {
     if ((left_cell.data()!=nullptr&&(!(memcmp((void*)left_cell.data(),__NULL_DATA__,4))&&right_cell.data()==nullptr)) ||  
       ((right_cell.data()!=nullptr&&!(memcmp((void*)right_cell.data(),__NULL_DATA__,4))&&left_cell.data()==nullptr))) filter_result =1;
+    else if (left_cell.data()==nullptr&&right_cell.data()==nullptr){
+      filter_result=1;
+    }
     else {
           filter_result =0;
       }
