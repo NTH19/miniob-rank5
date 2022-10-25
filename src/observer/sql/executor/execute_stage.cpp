@@ -588,7 +588,7 @@ bool gen_compare_res(TupleCell &l, TupleCell &r, CompOp &cmp)
 }
 void dfs(std::vector<Table *> &tables, int step, const std::vector<Field> query_fields, RowTuple *lastTuple,
     std::string lastRes, std::string &res,
-    std::map<std::pair<std::string, std::string>, std::tuple<FieldExpr *, FieldExpr *, CompOp>> &mtoF,
+    std::map<std::pair<std::string, std::string>, std::vector<std::tuple<FieldExpr *, FieldExpr *, CompOp>>> &mtoF,
     std::map<std::string, ProjectOperator *> &tableToProject, FilterStmt *filter, bool needJoin,
     std::vector<RowTuple *> &tuples)
 {
@@ -608,32 +608,40 @@ void dfs(std::vector<Table *> &tables, int step, const std::vector<Field> query_
       canAdd = true;
       for (int i = 0; i < step; ++i) {
         if (mtoF.count(std::pair<std::string, std::string>(std::string(tables[i]->name()), nowTablename))) {
-          auto [l, r, cmp] = mtoF[std::pair<std::string, std::string>(tables[i]->name(), nowTablename)];
-          TupleCell left_cell;
-          TupleCell right_cell;
-          if (l->get_value(*tuples[i], left_cell) == RC::NOTFOUND)
-            continue;
-          if (r->get_value(*tuple, right_cell) == RC::NOTFOUND)
-            continue;
-          if(!gen_compare_res(left_cell, right_cell, cmp)){
-            canAdd=false;
-            break;
+          auto ve = mtoF[std::pair<std::string, std::string>(std::string(tables[i]->name()), nowTablename)];
+          for (auto &x : ve) {
+            auto [l, r, cmp] = x;
+            TupleCell left_cell;
+            TupleCell right_cell;
+            if (l->get_value(*tuples[i], left_cell) == RC::NOTFOUND)
+              continue;
+            if (r->get_value(*tuple, right_cell) == RC::NOTFOUND)
+              continue;
+            if (!gen_compare_res(left_cell, right_cell, cmp)) {
+              canAdd = false;
+              break;
+            }
           }
-        }else if(mtoF.count(std::pair<std::string, std::string>(std::string(nowTablename),tables[i]->name()))){
-          auto [l, r, cmp] = mtoF[std::pair<std::string, std::string>(nowTablename, tables[i]->name())];
-          TupleCell left_cell;
-          TupleCell right_cell;
-          if (l->get_value(*tuple, left_cell) == RC::NOTFOUND)
-            continue;
-          if (r->get_value(*tuples[i], right_cell) == RC::NOTFOUND)
-            continue;
-          if(!gen_compare_res(left_cell, right_cell, cmp)){
-            canAdd=false;
-            break;
+
+        } else if (mtoF.count(std::pair<std::string, std::string>(std::string(nowTablename), tables[i]->name()))) {
+          auto ve = mtoF[std::pair<std::string, std::string>(nowTablename, tables[i]->name())];
+          for (auto &v : ve) {
+            auto [l, r, cmp] = v;
+            TupleCell left_cell;
+            TupleCell right_cell;
+            if (l->get_value(*tuple, left_cell) == RC::NOTFOUND)
+              continue;
+            if (r->get_value(*tuples[i], right_cell) == RC::NOTFOUND)
+              continue;
+            if (!gen_compare_res(left_cell, right_cell, cmp)) {
+              canAdd = false;
+              break;
+            }
           }
         }
       }
-    } else canAdd = true;
+    } else
+      canAdd = true;
     if (canAdd) {
       ProjectTuple *p2;
       std::stringstream kl;
@@ -657,14 +665,14 @@ void dfs(std::vector<Table *> &tables, int step, const std::vector<Field> query_
               tuples);
           tuples.pop_back();
         } else
-          res=res+ lastRes + ((step == 0 || lastRes.size() == 0) ? "" : " | ") + temp + "\n";
+          res = res + lastRes + ((step == 0 || lastRes.size() == 0) ? "" : " | ") + temp + "\n";
       } else {
-        if (step != tables.size() - 1){
+        if (step != tables.size() - 1) {
           tuples.push_back(tuple);
           dfs(tables, step + 1, query_fields, tuple, lastRes, res, mtoF, tableToProject, filter, needJoin, tuples);
           tuples.pop_back();
-        }else
-          res= res+ lastRes+"\n";
+        } else
+          res = res + lastRes + "\n";
       }
     }
   }
@@ -684,15 +692,15 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     auto cons = select_stmt->filter_stmt()->filter_units();
     FieldExpr *left_attr;
     FieldExpr *right_attr;
-    std::map<std::pair<std::string, std::string>, std::tuple<FieldExpr *, FieldExpr *, CompOp>> mtoF;
+    std::map<std::pair<std::string, std::string>, std::vector<std::tuple<FieldExpr *, FieldExpr *, CompOp>>> mtoF;
     bool need_join = false;
     for (int i = 0; i < cons.size(); ++i) {
       if (dynamic_cast<FieldExpr *>(cons[i]->left()) != 0 && dynamic_cast<FieldExpr *>(cons[i]->right()) != 0) {
         left_attr = dynamic_cast<FieldExpr *>(cons[i]->left());
         right_attr = dynamic_cast<FieldExpr *>(cons[i]->right());
         need_join = true;
-        mtoF[std::pair<std::string, std::string>(left_attr->table_name(), right_attr->table_name())] =
-            std::tuple<FieldExpr *, FieldExpr *, CompOp>(left_attr, right_attr, cons[i]->comp());
+        mtoF[std::pair<std::string, std::string>(left_attr->table_name(), right_attr->table_name())].push_back(
+            std::tuple<FieldExpr *, FieldExpr *, CompOp>(left_attr, right_attr, cons[i]->comp()));
       }
     }
 
@@ -715,10 +723,10 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     }
     project_oper.resize(accuse + 1);
     p_mutiple_table_header(ss, project_oper, select_stmt->need_reverse);
-    std::vector<RowTuple*>start;
+    std::vector<RowTuple *> start;
     std::string res;
-    dfs(tables, 0, query_fields, nullptr, "", res, mtoF, m, select_stmt->filter_stmt(), need_join,start);
-    session_event->set_response(ss.str()+res);
+    dfs(tables, 0, query_fields, nullptr, "", res, mtoF, m, select_stmt->filter_stmt(), need_join, start);
+    session_event->set_response(ss.str() + res);
     return rc;
   }
 
