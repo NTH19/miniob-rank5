@@ -60,26 +60,27 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
     }
 
     tables.push_back(table);
-    table_map.insert(std::pair<std::string, Table*>(table_name, table));
+    table_map.insert(std::pair<std::string, Table *>(table_name, table));
   }
-  if(select_sql.aggfun_num &&select_sql.attr_num){
+  if (select_sql.aggfun_num && select_sql.attr_num) {
     return RC::GENERIC_ERROR;
-  } 
+  }
 
-  std::vector<std::pair<DescribeFun,Field>> funs;
+  std::vector<std::pair<DescribeFun, Field>> funs;
   std::vector<Field> fun_fields(select_sql.aggfun_num);
   for (int i = select_sql.aggfun_num - 1; i >= 0; i--) {
     const RelAttr &relation_attr = select_sql.aggFun[i].attr;
-    if (relation_attr.relation_name != nullptr && !table_map.count(relation_attr.relation_name)) {
+    if (relation_attr.relation_name != nullptr &&
+        !table_map.count(std::string(relation_attr.relation_name))) {
       LOG_WARN("invalid table name in aggregate: %s", relation_attr.relation_name);
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
-    if ( 0==strcmp(relation_attr.attribute_name, "*")) {
-      const FieldMeta *field_meta= tables[0]->table_meta().field(2);
+    if (0 == strcmp(relation_attr.attribute_name, "*")) {
+      const FieldMeta *field_meta = tables[0]->table_meta().field(1);
       if (nullptr == field_meta) {
         return RC::SCHEMA_FIELD_MISSING;
       }
-      fun_fields[i]=Field(tables[0], field_meta);
+      fun_fields[i] = Field(tables[0], field_meta);
     } else {
       if (tables.size() != 1) {
         LOG_WARN("invalid. I do not know the attr's table. attr=%s", relation_attr.attribute_name);
@@ -93,11 +94,10 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
         return RC::SCHEMA_FIELD_MISSING;
       }
 
-      fun_fields[i]=Field(table, field_meta);
+      fun_fields[i] = Field(table, field_meta);
     }
-    funs.push_back(std::pair<DescribeFun,Field>(select_sql.aggFun[i].des,fun_fields[i]));
+    funs.push_back(std::pair<DescribeFun, Field>(select_sql.aggFun[i].des, fun_fields[i]));
   }
-
 
   // collect query fields in `select` statement
   std::vector<Field> query_fields;
@@ -109,7 +109,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
         wildcard_fields(table, query_fields);
       }
 
-    } else if (!common::is_blank(relation_attr.relation_name)) { // TODO
+    } else if (!common::is_blank(relation_attr.relation_name)) {  // TODO
       const char *table_name = relation_attr.relation_name;
       const char *field_name = relation_attr.attribute_name;
 
@@ -138,7 +138,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
             return RC::SCHEMA_FIELD_MISSING;
           }
 
-        query_fields.push_back(Field(table, field_meta));
+          query_fields.push_back(Field(table, field_meta));
         }
       }
     } else {
@@ -167,8 +167,8 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
 
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
-  RC rc = FilterStmt::create(db, default_table, &table_map,
-           select_sql.conditions, select_sql.condition_num, filter_stmt);
+  RC rc =
+      FilterStmt::create(db, default_table, &table_map, select_sql.conditions, select_sql.condition_num, filter_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct filter stmt");
     return rc;
@@ -180,7 +180,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
   select_stmt->funs_.swap(funs);
   select_stmt->query_fields_.swap(query_fields);
   select_stmt->filter_stmt_ = filter_stmt;
-  select_stmt->need_reverse=select_sql.need_Revere;
+  select_stmt->need_reverse = select_sql.need_Revere;
   stmt = select_stmt;
   return RC::SUCCESS;
 }

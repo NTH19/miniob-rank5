@@ -151,6 +151,7 @@ void selects_append_aggfun(Selects *selects, AggFun * a)
 void Init_AggFun(AggFun * a, DescribeFun des, const char* arr_name){
   a->attr.attribute_name = strdup(arr_name);
   a->des = des;
+  a->attr.relation_name=nullptr;
 }
 
 void Init_AggFun_Rel(AggFun *a, DescribeFun des, const char* rel_name, const char* arr_name) {

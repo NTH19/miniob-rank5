@@ -47,7 +47,6 @@ RC UpdateStmt::create(Db *db, const Updates &update, Stmt *&stmt)
   }
 
   // CHAR and TEXT is same
-
   std::vector<UpdateAttrInfo> update_attrs;
   for (size_t i = 0; i < update.attr_num; i ++) {
     const UpdateAttr &attr = update.update_attrs[i];
@@ -56,7 +55,7 @@ RC UpdateStmt::create(Db *db, const Updates &update, Stmt *&stmt)
       LOG_WARN("no such field. field=%s.%s.%s", db->name(), table->name(), attr.attribute_name);
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
-    if(attr.value.type != UNDEFINED) {
+    if(attr.value.type != UNDEFINED||attr.value._is_null) {
       if (update.attr_num == 1 && field->type() != attr.value.type && !(field->type() == TEXTS && attr.value.type == CHARS)&&!(field->nullable()&&attr.value._is_null)) {
         LOG_WARN("field type not match. field=%s.%s.%s", db->name(), table->name(), attr.attribute_name);
         for(auto &attr : update_attrs) {

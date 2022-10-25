@@ -463,7 +463,7 @@ void do_aggfun(std::vector<std::pair<int, int>> &ret, std::vector<int> &char_len
   return;
 }
 void gen_result(std::vector<std::pair<int, int>> &ret, const std::vector<std::pair<DescribeFun, Field>> &funs,
-    std::ostream &os, int cnt, std::vector<int> &char_len)
+    std::ostream &os,  std::vector<int> &char_len)
 {
   bool is_first = true;
   for (int i = 0; i < ret.size(); ++i) {
@@ -476,8 +476,7 @@ void gen_result(std::vector<std::pair<int, int>> &ret, const std::vector<std::pa
     } else
       os << " | ";
     if (funs[i].first == AVG) {
-      os << static_cast<float>(ret[i].first) / ret[i].second;
-
+      os << (*(float*)&ret[i].first) / ret[i].second;
       continue;
     }
     if (funs[i].first == COUNT || funs[i].first == COUNT_STAR) {
@@ -841,7 +840,6 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     std::vector<std::pair<int, int>> ret(funs.size());
     std::vector<int> char_len(funs.size(), 0);
     init_ret_aggfun(ret, funs, char_len);
-    int cnt = 0;
     while ((rc = project_oper.next()) == RC::SUCCESS) {
       // get current record
       // write to response
@@ -860,7 +858,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     } else {
       rc = project_oper.close();
     }
-    gen_result(ret, funs, ss, cnt, char_len);
+    gen_result(ret, funs, ss,  char_len);
 
     session_event->set_response(ss.str());
     return rc;
@@ -1274,7 +1272,7 @@ RC ExecuteStage::do_update(UpdateStmt *update_stmt, SessionEvent *session_event)
 
   std::vector<UpdateAttrInfo> &update_attr = update_stmt->attrs();
   for(UpdateAttrInfo &attr : update_attr) {
-    if(attr.value_ == nullptr) {
+    if(attr.value_ == nullptr&& !attr.value_->_is_null) {
       RC rc2 = do_update_select(attr.select_stmt_, session_event, attr.selected_values);
       if (rc2 != SUCCESS) {
         LOG_ERROR("error occured during update-select: %s", strrc(rc2));

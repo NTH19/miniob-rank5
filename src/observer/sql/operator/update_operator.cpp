@@ -38,7 +38,10 @@ RC UpdateOperator::open()
       int record_data_size = field_meta->len();
       const Value &value = attr.value_ == nullptr ? attr.selected_values[0] : *attr.value_;
       const char *value_data = static_cast<char *>(value.data);
-
+      if (value._is_null){
+        memcpy(new_record_data + field_meta->offset(), __NULL_DATA__, 4);
+        continue;
+      }
       switch (field_meta->type()) {
       case CHARS:
         memset(new_record_data + field_meta->offset(), 0, field_meta->len());
@@ -71,12 +74,10 @@ RC UpdateOperator::open()
         rc = RC::SCHEMA_FIELD_TYPE_MISMATCH;
         break;
       }
-
       if (rc != RC::SUCCESS) {
         LOG_PANIC("cast error during update");
       }
     }
-    
     rc = table->update_record(trx_, &record, new_record_data);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to update record: %s", strrc(rc));
