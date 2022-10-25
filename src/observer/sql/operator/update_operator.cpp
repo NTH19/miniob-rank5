@@ -37,10 +37,15 @@ RC UpdateOperator::open()
     char *value_data = static_cast<char *>(update_stmt_->values()->data);
     memcpy(new_record_data, record.data_, record_size);
     if (field_meta->type() == CHARS) {
+      if (field_meta->nullable()&&update_stmt_->values()->_is_null){
+        memcpy(new_record_data + field_meta->offset(), __NULL_DATA__, record_data_size);
+      }
+      else{
       size_t value_len = strlen(value_data) + 1;
       record_data_size = std::min(record_data_size, static_cast<int>(value_len));
       memset(new_record_data + field_meta->offset(), 0, field_meta->len());
       memcpy(new_record_data + field_meta->offset(), value_data, record_data_size);
+      }
     } else if (field_meta->type() == TEXTS) {
       char *s;
       if (strlen(value_data) > 4096) {
@@ -54,7 +59,10 @@ RC UpdateOperator::open()
       int result = update_stmt_->table()->insert_text(s);
       memcpy(new_record_data + field_meta->offset(), &result, field_meta->len());
     } else {
-      memcpy(new_record_data + field_meta->offset(), update_stmt_->values()->data, record_data_size);
+      if (field_meta->nullable()&&update_stmt_->values()->_is_null){
+        memcpy(new_record_data + field_meta->offset(), __NULL_DATA__, record_data_size);
+      }
+      else memcpy(new_record_data + field_meta->offset(), update_stmt_->values()->data, record_data_size);
     }
 
     rc = table->update_record(trx_, &record, new_record_data);
