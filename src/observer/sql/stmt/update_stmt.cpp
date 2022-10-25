@@ -13,22 +13,21 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/stmt/update_stmt.h"
+#include "sql/stmt/select_stmt.h"
 #include "common/log/log.h"
 #include "sql/stmt/filter_stmt.h"
 #include "storage/common/db.h"
 #include "storage/common/table.h"
-
-UpdateStmt::UpdateStmt(Table *table, const Value* values, int value_amount, FilterStmt *filter_stmt, const FieldMeta *field)
-  : table_ (table), values_(values), value_amount_(value_amount), 
-    filter_stmt_(filter_stmt), field_(field)
-{
-}
 
 UpdateStmt::~UpdateStmt(){
   if (nullptr != filter_stmt_) {
     delete filter_stmt_;
     filter_stmt_ = nullptr;
   } 
+  for(auto &attr : update_attrs_) {
+    delete attr.select_stmt_;
+  }
+  update_attrs_.clear();
 }
 
 RC UpdateStmt::create(Db *db, const Updates &update, Stmt *&stmt)
@@ -47,16 +46,35 @@ RC UpdateStmt::create(Db *db, const Updates &update, Stmt *&stmt)
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-  const FieldMeta *field = table->table_meta().field(update.attribute_name);
-  if (nullptr == field) {
-    LOG_WARN("no such field. field=%s.%s.%s", db->name(), table->name(), update.attribute_name);
-    return RC::SCHEMA_TABLE_NOT_EXIST;
-  }
-
-  // CHAR and TEXT is same
-  if (field->type() != update.value.type && (field->type() != TEXTS || update.value.type != CHARS)) {
-    LOG_WARN("field type not match. field=%s.%s.%s", db->name(), table->name(), update.attribute_name);
-    return RC::SCHEMA_TABLE_NOT_EXIST;
+  std::vector<UpdateAttrInfo> update_attrs;
+  for (size_t i = 0; i < update.attr_num; i ++) {
+    const UpdateAttr &attr = update.update_attrs[i];
+    const FieldMeta *field = table->table_meta().field(attr.attribute_name);
+    if (nullptr == field) {
+      LOG_WARN("no such field. field=%s.%s.%s", db->name(), table->name(), attr.attribute_name);
+      return RC::SCHEMA_TABLE_NOT_EXIST;
+    }
+    if(attr.value.type != UNDEFINED) {
+      if (update.attr_num == 1 && field->type() != attr.value.type && !(field->type() == TEXTS && attr.value.type == CHARS)) {
+        LOG_WARN("field type not match. field=%s.%s.%s", db->name(), table->name(), attr.attribute_name);
+        for(auto &attr : update_attrs) {
+          delete attr.select_stmt_;
+        }
+        return RC::SCHEMA_TABLE_NOT_EXIST;
+      }
+      update_attrs.emplace_back(field, &attr.value, nullptr);
+    } else {
+      Stmt *select_stmt = nullptr;
+      RC rc = SelectStmt::create(db, attr.select, select_stmt);
+      if (rc != RC::SUCCESS) {
+        for(auto &attr : update_attrs) {
+          delete attr.select_stmt_;
+        }
+        return rc;
+      }
+      update_attrs.emplace_back(field, nullptr, dynamic_cast<SelectStmt *>(select_stmt));
+    }
+    
   }
 
   std::unordered_map<std::string, Table *> table_map;
@@ -69,6 +87,10 @@ RC UpdateStmt::create(Db *db, const Updates &update, Stmt *&stmt)
     LOG_WARN("failed to create filter statement. rc=%d:%s", rc, strrc(rc));
     return rc;
   }
-  stmt = new UpdateStmt(table, &update.value, 1, filter_stmt, field);
+  UpdateStmt *update_stmt = new UpdateStmt();
+  update_stmt->table_ = table;
+  update_stmt->filter_stmt_ = filter_stmt;
+  update_stmt->update_attrs_.swap(update_attrs);
+  stmt = update_stmt;
   return rc;
 }

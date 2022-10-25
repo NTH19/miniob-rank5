@@ -90,10 +90,26 @@ void TupleCell::do_aggfun(int &ret,DescribeFun des,int& char_len)const {
     memcp_for_min(&ret,this->data_,res);
     break;
   case AVG:
-    *(float*)&ret+=*(float*)this->data_;
+    switch (this->attr_type_)
+    {
+    case FLOATS:
+      *(float*)&ret += *(float*)this->data_;
+      break;
+    case INTS:
+      *(float*)&ret += *(int*)this->data_;
+      break;
+    }
     break;
   case SUM:
-    ret+=*(int*)this->data_;
+    switch (this->attr_type_)
+    {
+    case FLOATS:
+      *(float*)&ret += *(float*)this->data_;
+      break;
+    case INTS:
+      ret += *(int*)this->data_;
+      break;
+    }
     break;
   }
 }
