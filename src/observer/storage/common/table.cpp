@@ -270,9 +270,10 @@ RC Table::show_index(std::vector<std::string>& ret){
   std::string head(this->name());
   for(size_t i = 0; i < indexes_.size(); ++ i){
     auto index_meta = indexes_[i]->index_meta();
+    std::string non_unique = index_meta.unique() ? "0" : "1";
     const std::vector<std::string> &field_name = index_meta.fields();
     for (size_t idx = 0; idx < field_name.size(); ++ idx) {
-      std::string s = head + " | 1 | " + std::string(index_meta.name()) + 
+      std::string s = head + " | " + (non_unique) + " | " + std::string(index_meta.name()) + 
                       " | " + std::to_string(idx + 1) + " | " + field_name[idx];
       ret.emplace_back(s);
     }
@@ -303,29 +304,10 @@ RC Table::insert_record(Trx *trx, Record *record)
 {
   RC rc = RC::SUCCESS;
 
-  if (trx != nullptr) {
-    trx->init_trx_info(this, *record);
-  }
   rc = record_handler_->insert_record(record->data(), table_meta_.record_size(), &record->rid());
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Insert record failed. table name=%s, rc=%d:%s", table_meta_.name(), rc, strrc(rc));
     return rc;
-  }
-
-  if (trx != nullptr) {
-    rc = trx->insert_record(this, record);
-    if (rc != RC::SUCCESS) {
-      LOG_ERROR("Failed to log operation(insertion) to trx");
-
-      RC rc2 = record_handler_->delete_record(&record->rid());
-      if (rc2 != RC::SUCCESS) {
-        LOG_ERROR("Failed to rollback record data when insert index entries failed. table name=%s, rc=%d:%s",
-            name(),
-            rc2,
-            strrc(rc2));
-      }
-      return rc;
-    }
   }
 
   rc = insert_entry_of_indexes(record->data(), record->rid());
@@ -348,6 +330,12 @@ RC Table::insert_record(Trx *trx, Record *record)
   }
 
   if (trx != nullptr) {
+    rc = trx->insert_record(this, record);
+    if (rc != RC::SUCCESS) {
+      LOG_PANIC("failed to insert record into trx: %s", strrc(rc));
+      return rc;
+    }
+
     // append clog record
     CLogRecord *clog_record = nullptr;
     rc = clog_manager_->clog_gen_record(CLogType::REDO_INSERT, trx->get_current_id(), clog_record, name(), table_meta_.record_size(), record);
@@ -777,7 +765,8 @@ static RC insert_index_record_reader_adapter(Record *record, void *context)
   return inserter.insert_index(record);
 }
 
-RC Table::create_index(Trx *trx, const char *index_name, const char * const attribute_name[], size_t attribute_count)
+RC Table::create_index(Trx *trx, const char *index_name, const char * const attribute_name[], 
+                        size_t attribute_count, bool unique)
 {
   if (common::is_blank(index_name) || attribute_count == 0) {
     LOG_INFO("Invalid input arguments, table name is %s, index_name is blank or attribute_name is blank", name());
@@ -809,7 +798,7 @@ RC Table::create_index(Trx *trx, const char *index_name, const char * const attr
   }
 
   IndexMeta new_index_meta;
-  RC rc = new_index_meta.init(index_name, field_meta);
+  RC rc = new_index_meta.init(index_name, field_meta, unique);
   if (rc != RC::SUCCESS) {
     LOG_INFO("Failed to init IndexMeta in table:%s, index_name:%s, field_name:%s",
              name(), index_name, attribute_name);
@@ -971,7 +960,11 @@ RC Table::update_record(Trx *trx, Record *record, const char *new_data) {
   RC rc = RC::SUCCESS;
   rc = update_entry_of_indexes(record->data(), &record->rid(), new_data);
   if (rc != RC::SUCCESS) {
-    LOG_ERROR("Failed to update indexes of record (rid=%d.%d). rc=%d:%s",record->rid().page_num, record->rid().slot_num, rc, strrc(rc));
+    if (rc != RC::RECORD_DUPLICATE_KEY) {
+      LOG_ERROR("Failed to update indexes of record (rid=%d.%d). rc=%d:%s",record->rid().page_num, record->rid().slot_num, rc, strrc(rc));
+    } else {
+      LOG_INFO("update indexes failed due to duplicate key");
+    }
     return rc;
   }
 
@@ -988,18 +981,6 @@ RC Table::update_record(Trx *trx, Record *record, const char *new_data) {
     // TODO: CLog
   }
 
-  return rc;
-}
-
-RC Table::update_entry_of_indexes(const char *record, const RID *rid, const char *new_data) {
-  RC rc = RC::SUCCESS;
-  for (Index *index : indexes_) {
-    rc = index->update_entry(record, rid, new_data);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("Failed to update_entry");
-      break;
-    }
-  }
   return rc;
 }
 
@@ -1173,6 +1154,28 @@ RC Table::delete_entry_of_indexes(const char *record, const RID &rid, bool error
       if (rc != RC::RECORD_INVALID_KEY || !error_on_not_exists) {
         break;
       }
+    }
+  }
+  return rc;
+}
+
+RC Table::update_entry_of_indexes(const char *record, const RID *rid, const char *new_data) {
+  RC rc = RC::SUCCESS;
+  for ( size_t i = 0; i < indexes_.size(); ++ i) {
+    Index *index = indexes_[i];
+    rc = index->update_entry(record, rid, new_data);
+    if (rc != RC::SUCCESS) {
+      if (rc != RECORD_DUPLICATE_KEY) {
+        LOG_WARN("Failed to update_entry: %s", strrc(rc));
+      }
+      // rollback update
+      for(size_t j = 0; j < i; ++ j) {
+        RC rc2 = indexes_[j]->update_entry(new_data, rid, record);
+        if (rc2 != RC::SUCCESS) {
+          LOG_PANIC("failed to rollback update: %s", strrc(rc));
+        }
+      }
+      break;
     }
   }
   return rc;
