@@ -55,8 +55,18 @@ RC UpdateStmt::create(Db *db, const Updates &update, Stmt *&stmt)
       LOG_WARN("no such field. field=%s.%s.%s", db->name(), table->name(), attr.attribute_name);
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
-    if(attr.value.type != UNDEFINED||attr.value._is_null) {
-      if (update.attr_num == 1 && field->type() != attr.value.type && !(field->type() == TEXTS && attr.value.type == CHARS)&&!(field->nullable()&&attr.value._is_null)) {
+    if(attr.value.type != UNDEFINED || attr.value._is_null) {
+      // set attr = value
+      if (attr.value._is_null && !field->nullable()) {
+        LOG_WARN("cannot update null to non-null field. field=%s.%s.%s", db->name(), table->name(), attr.attribute_name);
+        for(auto &attr : update_attrs) {
+          delete attr.select_stmt_;
+        }
+        return RC::SCHEMA_TABLE_NOT_EXIST;
+      }
+
+      if (update.attr_num == 1 && field->type() != attr.value.type && !(field->type() == TEXTS && attr.value.type == CHARS) 
+          && !(field->nullable() && attr.value._is_null)) {
         LOG_WARN("field type not match. field=%s.%s.%s", db->name(), table->name(), attr.attribute_name);
         for(auto &attr : update_attrs) {
           delete attr.select_stmt_;
@@ -65,6 +75,7 @@ RC UpdateStmt::create(Db *db, const Updates &update, Stmt *&stmt)
       }
       update_attrs.emplace_back(field, &attr.value, nullptr);
     } else {
+      // set attr = (select xxx from xxx)
       Stmt *select_stmt = nullptr;
       RC rc = SelectStmt::create(db, attr.select, select_stmt);
       if (rc != RC::SUCCESS) {
@@ -82,7 +93,7 @@ RC UpdateStmt::create(Db *db, const Updates &update, Stmt *&stmt)
 
   FilterStmt *filter_stmt = nullptr;
   RC rc = FilterStmt::create(db, table, &table_map,
-			     update.conditions,update.condition_num, filter_stmt);
+			     update.conditions, update.condition_num, filter_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to create filter statement. rc=%d:%s", rc, strrc(rc));
     return rc;

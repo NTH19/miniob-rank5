@@ -58,13 +58,13 @@ void memcp_for_min(void* dst,void* cmp,int accro){
 }
 void TupleCell::do_aggfun(std::pair<int,int>&ret,DescribeFun des,int& char_len)const {
   int res=0;
-  if (check_null()&& des!=COUNT_STAR) return;
+  if (check_null() && des != COUNT_STAR) return;
   ret.second++;
   switch (this->attr_type_) {
-  case INTS: res= compare_int(this->data_, (void*)&ret.first);break;
-  case FLOATS: res= compare_float(this->data_, (void*)&ret.first);break;
-  case DATES: res= compare_int(this->data_, (void*)&ret.first);break;
-  case CHARS: res=compare_string(this->data_, this->length_, (void*)&ret.first,char_len);
+  case INTS: res = compare_int(this->data_, (void*)&ret.first); break;
+  case FLOATS: res = compare_float(this->data_, (void*)&ret.first); break;
+  case DATES: res = compare_int(this->data_, (void*)&ret.first); break;
+  case CHARS: res = compare_string(this->data_, this->length_, (void*)&ret.first,char_len);
   break;
   }
   //to do :reduce the code
