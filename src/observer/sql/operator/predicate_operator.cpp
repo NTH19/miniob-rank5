@@ -80,6 +80,47 @@ bool PredicateOperator::do_predicate(RowTuple &tuple)
 
     const int compare = (comp >= LIKE_TO ? 0 : left_cell.compare(right_cell));
     bool filter_result = false;
+    if (left_cell.data()==nullptr||right_cell.data()==nullptr){
+      switch (comp) {
+    case EQUAL_TO: 
+    case LESS_EQUAL: 
+    case NOT_EQUAL: 
+    case LESS_THAN:
+    case GREAT_EQUAL: 
+    case GREAT_THAN: {
+      filter_result = 0;
+    } break;
+    case LIKE_TO: {
+      filter_result = left_cell.like(right_cell);
+    } break;
+    case NOT_LIKE: {
+      filter_result = !left_cell.like(right_cell);
+    } break;
+    case COMP_IS_NOT:{
+      if ((left_cell.data()!=nullptr&&(!(memcmp((void*)left_cell.data(),__NULL_DATA__,4))&&right_cell.data()==nullptr)) ||  
+      ((right_cell.data()!=nullptr&&!(memcmp((void*)right_cell.data(),__NULL_DATA__,4))&&left_cell.data()==nullptr))) filter_result =0;
+      else if (left_cell.data()==nullptr&&right_cell.data()==nullptr){
+      filter_result=0;
+    }else {
+          filter_result =1;
+      }
+    }break;
+    case COMP_IS: {
+    if ((left_cell.data()!=nullptr&&(!(memcmp((void*)left_cell.data(),__NULL_DATA__,4))&&right_cell.data()==nullptr)) ||  
+      ((right_cell.data()!=nullptr&&!(memcmp((void*)right_cell.data(),__NULL_DATA__,4))&&left_cell.data()==nullptr))) filter_result =1;
+    else if (left_cell.data()==nullptr&&right_cell.data()==nullptr){
+      filter_result=1;
+    }
+    else {
+          filter_result =0;
+      }
+    }break;
+    default: {
+      LOG_WARN("invalid compare type: %d", comp);
+    } break;
+    }
+    }
+    else {
     switch (comp) {
     case EQUAL_TO: {
       filter_result = (0 == compare); 
@@ -105,9 +146,22 @@ bool PredicateOperator::do_predicate(RowTuple &tuple)
     case NOT_LIKE: {
       filter_result = !left_cell.like(right_cell);
     } break;
+    case COMP_IS_NOT:{
+      if (left_cell.data()==nullptr&&right_cell.data()==nullptr) filter_result =0;
+      else {
+          filter_result =1;
+      }
+    }break;
+    case COMP_IS: {
+    if (left_cell.data()==nullptr&&right_cell.data()==nullptr) filter_result =1;
+    else {
+          filter_result =0;
+      }
+    }break;
     default: {
       LOG_WARN("invalid compare type: %d", comp);
     } break;
+      }
     }
     if (!filter_result) {
       return false;

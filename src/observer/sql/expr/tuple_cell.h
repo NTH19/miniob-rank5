@@ -39,7 +39,12 @@ public:
 
   int compare(const TupleCell &other) const;
 
-  void do_aggfun(int &ret,DescribeFun,int&char_len) const;
+  void do_aggfun(std::pair<int,int> &ret,DescribeFun,int&char_len) const;
+
+   bool check_null() const {
+    if (memcmp( this->data_,__NULL_DATA__,4)==0) return true;
+    else return false;
+  };
 
   bool like(const TupleCell &other) const;
 
