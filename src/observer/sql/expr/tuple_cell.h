@@ -42,8 +42,10 @@ public:
   void do_aggfun(std::pair<int,int> &ret,DescribeFun,int&char_len) const;
 
    bool check_null() const {
-    if (memcmp( this->data_,__NULL_DATA__,4)==0) return true;
-    else return false;
+    if(this->data_ == nullptr || memcmp(this->data_, __NULL_DATA__, 4) == 0) {
+      return true;
+    }
+    return false;
   };
 
   bool like(const TupleCell &other) const;

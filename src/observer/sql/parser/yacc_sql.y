@@ -571,9 +571,11 @@ select:				/*  select 语句的语法解析树*/
 			CONTEXT->select_length=0;
 			CONTEXT->value_length = 0;
 		}
-	| SELECT agg_fun_list_head FROM ID SEMICOLON{
+	| SELECT agg_fun_list_head FROM ID where SEMICOLON{
 		selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
+		selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
 		CONTEXT->ssql->flag=SCF_SELECT;
+
 		CONTEXT->condition_length=0;
 		CONTEXT->from_length=0;
 		CONTEXT->select_length=0;

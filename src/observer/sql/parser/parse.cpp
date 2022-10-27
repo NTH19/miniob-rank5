@@ -40,6 +40,7 @@ void relation_attr_destroy(RelAttr *relation_attr)
   relation_attr->attribute_name = nullptr;
 }
 void value_init_null(Value *value) {
+  value->data = nullptr;
   value->type = UNDEFINED;
   value->_is_null = 1;
 }

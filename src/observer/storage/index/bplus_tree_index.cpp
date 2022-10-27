@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "storage/index/bplus_tree_index.h"
 #include "common/log/log.h"
+#include "storage/common/table.h"
 
 BplusTreeIndex::~BplusTreeIndex() noexcept
 {
@@ -124,8 +125,19 @@ RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
     }
 
     if(!rids.empty()) {
-      delete[] user_key;
-      return RC::RECORD_DUPLICATE_KEY;
+      int offset = 0;
+      bool has_null = false;
+      for(const FieldMeta &field : field_meta_) {
+        if(memcmp(user_key + offset, __NULL_DATA__, 4) == 0) {
+          has_null = true;
+          break;
+        }
+        offset += field.len();
+      }
+      if (!has_null) {
+        delete[] user_key;
+        return RC::RECORD_DUPLICATE_KEY;
+      }
     }
   }
 

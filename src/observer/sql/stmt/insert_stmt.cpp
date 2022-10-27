@@ -56,7 +56,12 @@ RC InsertStmt::create(Db *db, const Inserts &inserts, Stmt *&stmt)
       const FieldMeta *field_meta = table_meta.field(i + sys_field_num);
       const AttrType field_type = field_meta->type();
       const AttrType value_type = rvalues[i].type;
-      if (inserts.record_num > 1 && field_type != value_type && !(TEXTS == field_type && CHARS == value_type)&&!(rvalues[i]._is_null&&field_meta->nullable())) { 
+      if (rvalues[i]._is_null && !field_meta->nullable()) { 
+        LOG_WARN("cannot insert null to non-null field. table=%s, field=%s", table_name, field_meta->name());
+        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+      }
+      if (inserts.record_num > 1 && field_type != value_type && !(TEXTS == field_type && CHARS == value_type) && 
+          !(rvalues[i]._is_null && field_meta->nullable())) { 
         LOG_WARN("field type mismatch. table=%s, field=%s, field type=%d, value_type=%d", 
                 table_name, field_meta->name(), field_type, value_type);
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;

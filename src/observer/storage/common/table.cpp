@@ -405,12 +405,13 @@ RC Table::insert_records(Trx *trx, int record_num,int value_num, const Value val
     for (int i = 0; i < value_num; i++) {
       const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
       const Value &value = valuesc[i];
-      if (value.type == UNDEFINED &&  !(value._is_null == true && field->nullable() == true)) {// value maybe null 
+      if (value.type == UNDEFINED && !(value._is_null && field->nullable())) {// value maybe null 
         return RC::SCHEMA_FIELD_TYPE_MISMATCH;
       }
       // multiple update should check type
       if (record_num > 1) { 
-        if (field->type() != value.type && !(TEXTS == field->type() && CHARS == value.type) &&!(value._is_null == true && field->nullable() == true)) {
+        if (field->type() != value.type && !(TEXTS == field->type() && CHARS == value.type) 
+            && !(value._is_null && field->nullable())) {
           return RC::SCHEMA_FIELD_TYPE_MISMATCH;
         }
       }

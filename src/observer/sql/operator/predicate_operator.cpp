@@ -78,89 +78,83 @@ bool PredicateOperator::do_predicate(RowTuple &tuple)
     if(left_expr->get_value(tuple, left_cell)==RC::NOTFOUND)continue;
     if(right_expr->get_value(tuple, right_cell)==RC::NOTFOUND)continue;
 
-    const int compare = (comp >= LIKE_TO ? 0 : left_cell.compare(right_cell));
     bool filter_result = false;
-    if (left_cell.data()==nullptr||right_cell.data()==nullptr){
+    bool left_null = left_cell.check_null();
+    bool right_null = right_cell.check_null();
+
+    if (left_null || right_null) {
       switch (comp) {
-    case EQUAL_TO: 
-    case LESS_EQUAL: 
-    case NOT_EQUAL: 
-    case LESS_THAN:
-    case GREAT_EQUAL: 
-    case GREAT_THAN: {
-      filter_result = 0;
-    } break;
-    case LIKE_TO: {
-      filter_result = left_cell.like(right_cell);
-    } break;
-    case NOT_LIKE: {
-      filter_result = !left_cell.like(right_cell);
-    } break;
-    case COMP_IS_NOT:{
-      if ((left_cell.data()!=nullptr&&(!(memcmp((void*)left_cell.data(),__NULL_DATA__,4))&&right_cell.data()==nullptr)) ||  
-      ((right_cell.data()!=nullptr&&!(memcmp((void*)right_cell.data(),__NULL_DATA__,4))&&left_cell.data()==nullptr))) filter_result =0;
-      else if (left_cell.data()==nullptr&&right_cell.data()==nullptr){
-      filter_result=0;
-    }else {
-          filter_result =1;
+        case EQUAL_TO: 
+        case LESS_EQUAL: 
+        case NOT_EQUAL: 
+        case LESS_THAN:
+        case GREAT_EQUAL: 
+        case GREAT_THAN:
+        case LIKE_TO:
+        case NOT_LIKE:
+          filter_result = false;
+          break;
+        case COMP_IS_NOT:{
+          if(!left_null && right_null) { // value is not null
+            filter_result = true;
+          } else if (left_null && !right_null) { // null is not value
+            filter_result = true;
+          } else {                               // null is null
+            filter_result = false;
+          }
+          break;
+        }
+        case COMP_IS: {
+          if(!left_null && right_null) { // value is null
+            filter_result = false;
+          } else if (left_null && !right_null) { // null is value
+            filter_result = false;
+          } else {                              // null is null
+            filter_result = true;
+          }
+          break;
+        }
+        default: {
+          LOG_WARN("invalid compare type: %d", comp);
+        } break;
       }
-    }break;
-    case COMP_IS: {
-    if ((left_cell.data()!=nullptr&&(!(memcmp((void*)left_cell.data(),__NULL_DATA__,4))&&right_cell.data()==nullptr)) ||  
-      ((right_cell.data()!=nullptr&&!(memcmp((void*)right_cell.data(),__NULL_DATA__,4))&&left_cell.data()==nullptr))) filter_result =1;
-    else if (left_cell.data()==nullptr&&right_cell.data()==nullptr){
-      filter_result=1;
     }
     else {
-          filter_result =0;
-      }
-    }break;
-    default: {
-      LOG_WARN("invalid compare type: %d", comp);
-    } break;
-    }
-    }
-    else {
-    switch (comp) {
-    case EQUAL_TO: {
-      filter_result = (0 == compare); 
-    } break;
-    case LESS_EQUAL: {
-      filter_result = (compare <= 0); 
-    } break;
-    case NOT_EQUAL: {
-      filter_result = (compare != 0);
-    } break;
-    case LESS_THAN: {
-      filter_result = (compare < 0);
-    } break;
-    case GREAT_EQUAL: {
-      filter_result = (compare >= 0);
-    } break;
-    case GREAT_THAN: {
-      filter_result = (compare > 0);
-    } break;
-    case LIKE_TO: {
-      filter_result = left_cell.like(right_cell);
-    } break;
-    case NOT_LIKE: {
-      filter_result = !left_cell.like(right_cell);
-    } break;
-    case COMP_IS_NOT:{
-      if (left_cell.data()==nullptr&&right_cell.data()==nullptr) filter_result =0;
-      else {
-          filter_result =1;
-      }
-    }break;
-    case COMP_IS: {
-    if (left_cell.data()==nullptr&&right_cell.data()==nullptr) filter_result =1;
-    else {
-          filter_result =0;
-      }
-    }break;
-    default: {
-      LOG_WARN("invalid compare type: %d", comp);
-    } break;
+      const int compare = (comp >= LIKE_TO ? 0 : left_cell.compare(right_cell));
+      switch (comp) {
+        case EQUAL_TO: {
+          filter_result = (0 == compare); 
+        } break;
+        case LESS_EQUAL: {
+          filter_result = (compare <= 0); 
+        } break;
+        case NOT_EQUAL: {
+          filter_result = (compare != 0);
+        } break;
+        case LESS_THAN: {
+          filter_result = (compare < 0);
+        } break;
+        case GREAT_EQUAL: {
+          filter_result = (compare >= 0);
+        } break;
+        case GREAT_THAN: {
+          filter_result = (compare > 0);
+        } break;
+        case LIKE_TO: {
+          filter_result = left_cell.like(right_cell);
+        } break;
+        case NOT_LIKE: {
+          filter_result = !left_cell.like(right_cell);
+        } break;
+        case COMP_IS_NOT:{
+          filter_result = false;
+        }break;
+        case COMP_IS: {
+          filter_result = false;
+        }break;
+        default: {
+          LOG_WARN("invalid compare type: %d", comp);
+        } break;
       }
     }
     if (!filter_result) {
