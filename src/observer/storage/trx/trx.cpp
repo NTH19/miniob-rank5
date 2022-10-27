@@ -76,6 +76,7 @@ Trx::~Trx()
 RC Trx::insert_record(Table *table, Record *record)
 {
   RC rc = RC::SUCCESS;
+  start_if_not_started();
   // 先校验是否以前是否存在过(应该不会存在)
   Operation *old_oper = find_operation(table, record->rid());
   if (old_oper != nullptr) {
@@ -86,14 +87,14 @@ RC Trx::insert_record(Table *table, Record *record)
     }
   }
 
-  // start_if_not_started();
-  
   // 记录到operations中
   insert_operation(table, Operation::Type::INSERT, record->rid());
   return rc;
 }
+
 RC Trx::update_record(Table *table, Record *record) {
   RC rc = RC::SUCCESS;
+  start_if_not_started();
   // 先校验是否以前是否存在过(应该不会存在) 
   Operation *old_oper = find_operation(table, record->rid());
   if (old_oper != nullptr) {
@@ -102,10 +103,8 @@ RC Trx::update_record(Table *table, Record *record) {
     }
   }
 
-  start_if_not_started();
-
   // 设置record中trx_field为当前的事务号
-  // set_record_trx_id(table, record, trx_id_, false);
+  // set_record_trx_id(table, *record, trx_id_, false);
   // 记录到operations中
   update_operation(table, Operation::Type::UPDATE, record->rid());
   return rc;
