@@ -47,6 +47,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/trx/trx.h"
 #include <algorithm>
 #include "storage/clog/clog.h"
+#include "util/util.h"
 
 using namespace common;
 
@@ -486,7 +487,7 @@ void gen_string_result(std::vector<std::pair<int, int>> &ret, const std::vector<
     } else
       os << " | ";
     if (funs[i].first == AVG) {
-      os << (*(float *)&ret[i].first) / ret[i].second;
+      os << double2string((*(float *)&ret[i].first) / ret[i].second);
       continue;
     }
     if (funs[i].first == COUNT || funs[i].first == COUNT_STAR) {
@@ -495,7 +496,7 @@ void gen_string_result(std::vector<std::pair<int, int>> &ret, const std::vector<
     }
     switch (funs[i].second.attr_type()) {
       case FLOATS:
-        os << *(float *)&ret[i].first;
+        os << double2string(*(float *)&ret[i].first);
         break;
       case INTS:
         os << ret[i].first;
