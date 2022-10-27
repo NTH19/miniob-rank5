@@ -79,6 +79,10 @@ void TupleCell::do_aggfun(std::pair<int,int>&ret,DescribeFun des,int& char_len)c
       ret.first=res<0?*(int*)this->data_:ret.first;
       char_len=ret.first==*(int*)this->data_?this->length_:char_len;
       break;
+    case AVG:
+      float num = atof(static_cast<const char *>(this->data_));
+      *(float*)&ret.first += num;
+      break;
     }
     return ;
   }

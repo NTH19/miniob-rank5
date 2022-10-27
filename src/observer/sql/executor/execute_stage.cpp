@@ -503,6 +503,10 @@ void gen_string_result(std::vector<std::pair<int, int>> &ret, const std::vector<
       case CHARS:
         os << std::string((char *)&ret[i].first, char_len[i]).c_str();
         break;
+      case DATES:
+        std::string s = std::to_string(ret[i].first);
+        os << s.substr(0,4) << "-" << s.substr(4,2) << "-" << s.substr(6,2);
+        break;
     }
   }
   os << "\n";
@@ -519,7 +523,7 @@ void init_ret_aggfun(std::vector<std::pair<int, int>> &ret, const std::vector<st
         char_len[i] = 3;
       } else if (funs[i].second.attr_type() == FLOATS) {
         *(float *)&ret[i].first = 99999999;
-      } else if (funs[i].second.attr_type() == INTS) {
+      } else if (funs[i].second.attr_type() == INTS || funs[i].second.attr_type() == DATES) {
         ret[i].first = INT32_MAX;
       }
     } else if (funs[i].first == MAX) {
@@ -528,7 +532,7 @@ void init_ret_aggfun(std::vector<std::pair<int, int>> &ret, const std::vector<st
         char_len[i] = 3;
       } else if (funs[i].second.attr_type() == FLOATS) {
         *(float *)&ret[i].first = 0;
-      } else if (funs[i].second.attr_type() == INTS) {
+      } else if (funs[i].second.attr_type() == INTS || funs[i].second.attr_type() == DATES) {
         ret[i].first = -100000;
       }
     } else if (funs[i].first == SUM || funs[i].first == AVG) {
@@ -871,8 +875,6 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     std::vector<std::pair<int, int>> ret;
     std::vector<int> char_len;
     auto funs = select_stmt->funs();
-    Operator *scan_oper = new TableScanOperator(select_stmt->tables()[0]);
-    delete scan_oper;
     if (gen_ret_of_aggfun(select_stmt,ret,char_len,ss) != RC::SUCCESS) {
       return RC::GENERIC_ERROR;
     }
@@ -1162,7 +1164,7 @@ void agg_result(std::vector<std::pair<int, int>> &ret, const std::vector<std::pa
         break;
       case AVG:
         value.type = FLOATS;
-        value.data = new float((*(float *)&ret[i].first) / ret[i].first);
+        value.data = new float((*(float *)&ret[i].first) / ret[i].second);
         break;
       default:
         switch (funs[i].second.attr_type()) {
@@ -1201,7 +1203,7 @@ RC do_update_select(SelectStmt *select_stmt, SessionEvent *session_event, std::v
     std::stringstream ss;
     std::vector<std::pair<int, int>> ret;
     std::vector<int> char_len;
-    if (gen_ret_of_aggfun(select_stmt,ret,char_len,ss) != RC::SUCCESS) {
+    if (gen_ret_of_aggfun(select_stmt, ret, char_len, ss) != RC::SUCCESS) {
       return RC::GENERIC_ERROR;
     }
     agg_result(ret, funs, char_len, out_value);
