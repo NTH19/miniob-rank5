@@ -1153,6 +1153,7 @@ void agg_result(std::vector<std::pair<int, int>> &ret, const std::vector<std::pa
       out_value.push_back(value);
       continue;
     }
+    value._is_null = 0;
     switch (funs[i].first) {
       case COUNT:
       case COUNT_STAR:
@@ -1247,6 +1248,7 @@ RC do_update_select(SelectStmt *select_stmt, SessionEvent *session_event, std::v
         value.type = UNDEFINED;
         value._is_null = 1;
       } else {
+        value._is_null = 0;
         value.type = cell.attr_type();
         char *str = new char[cell.length() + 1];
         memcpy(str, cell.data(), cell.length());
