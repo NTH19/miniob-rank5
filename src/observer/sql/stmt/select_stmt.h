@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 #include "rc.h"
 #include "sql/stmt/stmt.h"
 #include "storage/common/field.h"
+# include<map>
 
 class FieldMeta;
 class FilterStmt;
@@ -42,11 +43,13 @@ public:
   FilterStmt *filter_stmt() const { return filter_stmt_; }
   const std::vector<std::pair<DescribeFun,Field>> & funs()const {return funs_;}
   int need_reverse;
+  std::map<std::string,std::string> aliasset_;
 private:
   std::vector<Field> query_fields_;
   std::vector<Table *> tables_;
   std::vector<std::pair<DescribeFun,Field>> funs_;
   FilterStmt *filter_stmt_ = nullptr;
+  
   
 };
 

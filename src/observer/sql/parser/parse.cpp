@@ -24,6 +24,7 @@ extern "C" {
 #endif  // __cplusplus
 void relation_attr_init(RelAttr *relation_attr, const char *relation_name, const char *attribute_name)
 {
+  
   if (relation_name != nullptr) {
     relation_attr->relation_name = strdup(relation_name);
   } else {
@@ -148,6 +149,13 @@ void selects_append_aggfun(Selects *selects, AggFun * a)
 {
   selects->aggFun[selects->aggfun_num++]=*a;
 }
+
+void selects_append_alias(Selects *selects, const char * name,const char* alias)
+{
+  selects->real_name[selects->alias_num]=strdup(name);
+  selects->alias_name[selects->alias_num]=strdup(alias);
+  selects->alias_num++;
+}
 void Init_AggFun(AggFun * a, DescribeFun des, const char* arr_name){
   a->attr.attribute_name = strdup(arr_name);
   a->des = des;
@@ -189,6 +197,13 @@ void selects_destroy(Selects *selects)
 
   for(size_t i = 0; i < selects->aggfun_num; i++) {
     relation_attr_destroy(&selects->aggFun[i].attr);
+  }
+  selects->aggfun_num = 0;
+  for(size_t i = 0; i < selects->alias_num; i++) {
+    free(selects->alias_name[i]);
+    free(selects->real_name[i]);
+    selects->alias_name[i]=NULL;
+    selects->real_name[i]-NULL;
   }
   selects->aggfun_num = 0;
 }

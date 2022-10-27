@@ -42,6 +42,15 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
     LOG_WARN("invalid argument. db is null");
     return RC::INVALID_ARGUMENT;
   }
+   std::map<std::string,std::string> alias_name_map;
+   std::map<std::string,std::string> name_alias_map;
+    for ( auto it = 0;it<select_sql.alias_num;it++)
+    //todo some deal
+  {
+    name_alias_map.emplace(std::string(select_sql.real_name[it]),std::string(select_sql.alias_name[it]));
+  alias_name_map.emplace(std::string(select_sql.alias_name[it]),std::string(select_sql.real_name[it]));
+  }
+
 
   // collect tables in `from` statement
   std::vector<Table *> tables;
@@ -101,6 +110,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
 
   // collect query fields in `select` statement
   std::vector<Field> query_fields;
+  int i = select_sql.attr_num - 1;
   for (int i = select_sql.attr_num - 1; i >= 0; i--) {
     const RelAttr &relation_attr = select_sql.attributes[i];
 
@@ -112,7 +122,8 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
     } else if (!common::is_blank(relation_attr.relation_name)) {  // TODO
       const char *table_name = relation_attr.relation_name;
       const char *field_name = relation_attr.attribute_name;
-
+      if(alias_name_map.count(std::string(table_name))) table_name=alias_name_map[std::string(table_name)].c_str();//alias->table
+      if(alias_name_map.count(std::string(field_name))) field_name=alias_name_map[std::string(field_name)].c_str();
       if (0 == strcmp(table_name, "*")) {
         if (0 != strcmp(field_name, "*")) {
           LOG_WARN("invalid field name while table is *. attr=%s", field_name);
@@ -181,6 +192,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
   select_stmt->query_fields_.swap(query_fields);
   select_stmt->filter_stmt_ = filter_stmt;
   select_stmt->need_reverse = select_sql.need_Revere;
+  select_stmt->aliasset_.swap(name_alias_map);
   stmt = select_stmt;
   return RC::SUCCESS;
 }

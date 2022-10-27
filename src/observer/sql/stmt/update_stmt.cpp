@@ -19,12 +19,13 @@ See the Mulan PSL v2 for more details. */
 #include "storage/common/db.h"
 #include "storage/common/table.h"
 
-UpdateStmt::~UpdateStmt(){
+UpdateStmt::~UpdateStmt()
+{
   if (nullptr != filter_stmt_) {
     delete filter_stmt_;
     filter_stmt_ = nullptr;
-  } 
-  for(auto &attr : update_attrs_) {
+  }
+  for (auto &attr : update_attrs_) {
     delete attr.select_stmt_;
   }
   update_attrs_.clear();
@@ -35,8 +36,7 @@ RC UpdateStmt::create(Db *db, const Updates &update, Stmt *&stmt)
   stmt = nullptr;
   const char *table_name = update.relation_name;
   if (nullptr == db || nullptr == table_name) {
-    LOG_WARN("invalid argument. db=%p, table_name=%p", 
-             db, table_name);
+    LOG_WARN("invalid argument. db=%p, table_name=%p", db, table_name);
     return RC::INVALID_ARGUMENT;
   }
   // check whether the table exists
@@ -48,17 +48,18 @@ RC UpdateStmt::create(Db *db, const Updates &update, Stmt *&stmt)
 
   // CHAR and TEXT is same
   std::vector<UpdateAttrInfo> update_attrs;
-  for (size_t i = 0; i < update.attr_num; i ++) {
+  for (size_t i = 0; i < update.attr_num; i++) {
     const UpdateAttr &attr = update.update_attrs[i];
     const FieldMeta *field = table->table_meta().field(attr.attribute_name);
     if (nullptr == field) {
       LOG_WARN("no such field. field=%s.%s.%s", db->name(), table->name(), attr.attribute_name);
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
-    if(attr.value.type != UNDEFINED||attr.value._is_null) {
-      if (update.attr_num == 1 && field->type() != attr.value.type && !(field->type() == TEXTS && attr.value.type == CHARS)&&!(field->nullable()&&attr.value._is_null)) {
+    if (attr.value.type != UNDEFINED || attr.value._is_null) {
+      if (update.attr_num == 1 && field->type() != attr.value.type &&
+          !(field->type() == TEXTS && attr.value.type == CHARS) && !(field->nullable() && attr.value._is_null)) {
         LOG_WARN("field type not match. field=%s.%s.%s", db->name(), table->name(), attr.attribute_name);
-        for(auto &attr : update_attrs) {
+        for (auto &attr : update_attrs) {
           delete attr.select_stmt_;
         }
         return RC::SCHEMA_TABLE_NOT_EXIST;
@@ -68,7 +69,7 @@ RC UpdateStmt::create(Db *db, const Updates &update, Stmt *&stmt)
       Stmt *select_stmt = nullptr;
       RC rc = SelectStmt::create(db, attr.select, select_stmt);
       if (rc != RC::SUCCESS) {
-        for(auto &attr : update_attrs) {
+        for (auto &attr : update_attrs) {
           delete attr.select_stmt_;
         }
         return rc;
@@ -81,8 +82,7 @@ RC UpdateStmt::create(Db *db, const Updates &update, Stmt *&stmt)
   table_map.insert(std::pair<std::string, Table *>(std::string(table_name), table));
 
   FilterStmt *filter_stmt = nullptr;
-  RC rc = FilterStmt::create(db, table, &table_map,
-			     update.conditions,update.condition_num, filter_stmt);
+  RC rc = FilterStmt::create(db, table, &table_map, update.conditions, update.condition_num, filter_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to create filter statement. rc=%d:%s", rc, strrc(rc));
     return rc;

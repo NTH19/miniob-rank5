@@ -101,6 +101,7 @@ ParserContext *get_context(yyscan_t scanner)
         VALUES
         FROM
         WHERE
+		AS
         AND
         SET
         ON
@@ -585,6 +586,27 @@ select:				/*  select 语句的语法解析树*/
 			CONTEXT->select_length=0;
 			CONTEXT->value_length = 0;
 		}
+	| SELECT select_attr FROM ID AS ID rel_list where SEMICOLON{
+		selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
+		selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
+		CONTEXT->ssql->flag=SCF_SELECT;//"select";
+		CONTEXT->condition_length=0;
+			CONTEXT->from_length=0;
+			CONTEXT->select_length=0;
+			CONTEXT->value_length = 0;
+		selects_append_alias(&CONTEXT->ssql->sstr.selection, $4,$6);
+	}
+	| SELECT agg_fun_list_head FROM ID AS ID SEMICOLON {
+		selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
+		selects_append_alias(&CONTEXT->ssql->sstr.selection, $4,$6);
+		CONTEXT->ssql->flag=SCF_SELECT;
+		CONTEXT->condition_length=0;
+		CONTEXT->from_length=0;
+		CONTEXT->select_length=0;
+		CONTEXT->value_length = 0;
+	}
+
+	
 	;
 join_list:
 	 /* empty */
@@ -601,6 +623,41 @@ agg_fun_list_head:
 		AggFun aggre;
 		Init_AggFun(&aggre,COUNT_STAR,"*");
 		selects_append_aggfun(&CONTEXT->ssql->sstr.selection,&aggre);
+	}
+	|COUNT_T LBRACE ID RBRACE agg_fun_list{
+		AggFun aggre;
+		Init_AggFun(&aggre,COUNT,$3);
+		selects_append_aggfun(&CONTEXT->ssql->sstr.selection,&aggre);
+	}
+	| MAX_T LBRACE ID RBRACE agg_fun_list{
+		AggFun aggre;
+		Init_AggFun(&aggre, MAX, $3);
+		selects_append_aggfun(&CONTEXT->ssql->sstr.selection, &aggre);
+		CONTEXT->select_length++;
+	  }
+	| MIN_T LBRACE ID RBRACE agg_fun_list{
+		AggFun aggre;
+		Init_AggFun(&aggre, MIN, $3);
+		selects_append_aggfun(&CONTEXT->ssql->sstr.selection, &aggre);
+		CONTEXT->select_length++;
+	  }
+	| SUM_T LBRACE ID RBRACE agg_fun_list{
+		AggFun aggre;
+		Init_AggFun(&aggre, SUM, $3);
+		selects_append_aggfun(&CONTEXT->ssql->sstr.selection, &aggre);
+		CONTEXT->select_length++;
+	  }
+	| AVG_T LBRACE ID RBRACE agg_fun_list{
+		AggFun aggre;
+		Init_AggFun(&aggre, AVG, $3);
+		selects_append_aggfun(&CONTEXT->ssql->sstr.selection, &aggre);
+		CONTEXT->select_length++;
+	  }
+	| COUNT_T LBRACE STAR RBRACE AS ID agg_fun_list{
+		AggFun aggre;
+		Init_AggFun(&aggre,COUNT_STAR,"*");
+		selects_append_aggfun(&CONTEXT->ssql->sstr.selection,&aggre);
+		selects_append_alias(&CONTEXT->ssql->sstr.selection,)
 	}
 	|COUNT_T LBRACE ID RBRACE agg_fun_list{
 		AggFun aggre;
@@ -670,7 +727,7 @@ agg_fun_list:
 	  }
 	;
 
-	
+
 select_attr:
     STAR attr_list {  
 			RelAttr attr;
@@ -694,6 +751,12 @@ select_attr:
 		relation_attr_init(&attr, $1, "*");
 		selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 	}
+	| ID AS ID attr_list{
+		RelAttr attr;
+		relation_attr_init(&attr, NULL, $1);
+		selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+		selects_append_alias(&CONTEXT->ssql->sstr.selection, $1,$3);
+	}
     ;
 attr_list:
     /* empty */
@@ -715,6 +778,13 @@ attr_list:
 			CONTEXT->ssql->sstr.selection.need_Revere=0;
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
   	  }
+	| COMMA ID AS ID attr_list{
+		RelAttr attr;
+		relation_attr_init(&attr, NULL, $2);
+		CONTEXT->ssql->sstr.selection.need_Revere=0;
+		selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+		selects_append_alias(&CONTEXT->ssql->sstr.selection, $2,$4);
+	}
   	;
 
 rel_list:
@@ -722,6 +792,10 @@ rel_list:
     | COMMA ID rel_list {	
 				selects_append_relation(&CONTEXT->ssql->sstr.selection, $2);
 		  }
+	| COMMA ID AS ID rel_list{
+		selects_append_relation(&CONTEXT->ssql->sstr.selection, $2);
+		selects_append_alias(&CONTEXT->ssql->sstr.selection, $2,$4);
+	}
     ;
 where:
     /* empty */ 

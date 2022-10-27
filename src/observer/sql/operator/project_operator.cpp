@@ -56,13 +56,27 @@ Tuple* ProjectOperator::process_one_tuple(Tuple * t){
   tuple_.set_tuple(t);
   return &tuple_;
 }
-void ProjectOperator::add_projection(const Table *table, const FieldMeta *field_meta,bool add_table)
+void ProjectOperator::add_projection(const Table *table, const FieldMeta *field_meta,std::map<std::string,std::string> alias_set,bool add_table)
 {
   // 对单表来说，展示的(alias) 字段总是字段名称，
   // 对多表查询来说，展示的alias 需要带表名字
   TupleCellSpec *spec = new TupleCellSpec(new FieldExpr(table, field_meta));
-  if(!add_table)spec->set_alias(field_meta->name());
-  else spec->set_alias((new std::string(table->name()))->append(".").append(field_meta->name()).c_str());
+  
+ int i=alias_set.count(std::string(field_meta->name()));
+ int j=alias_set.count(std::string( table->name()));
+  if(!add_table){
+    if( i>0 ) spec->set_alias(alias_set[std::string(field_meta->name())].c_str());
+    else spec->set_alias(field_meta->name());
+    }
+  else {
+    const char * field_name=nullptr;
+    const char * table_name=nullptr;
+    if( i>0)  field_name=alias_set[std::string(field_meta->name())].c_str();
+    else field_name=field_meta->name();
+    if (j>0) table_name=alias_set[std::string(table->name())].c_str();
+    else table_name=table->name();
+    spec->set_alias((new std::string(table_name))->append(".").append(field_name).c_str());
+  }
   tuple_.add_cell_spec(spec);
 }
 

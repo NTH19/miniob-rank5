@@ -14,7 +14,6 @@ See the Mulan PSL v2 for more details. */
 
 #ifndef __OBSERVER_SQL_PARSER_PARSE_DEFS_H__
 #define __OBSERVER_SQL_PARSER_PARSE_DEFS_H__
-
 #include <stddef.h>
 
 #define MAX_NUM 20
@@ -97,6 +96,9 @@ typedef struct {
   AggFun aggFun[MAX_NUM];
   int need_Revere;
   int need_reverse_join;
+  char * real_name[MAX_NUM];
+  char * alias_name[MAX_NUM];
+  size_t alias_num;
 } Selects;
 
 // struct of insert
@@ -247,6 +249,7 @@ void Init_AggFun_Rel(AggFun *a, DescribeFun des, const char* rel_name, const cha
 
 void selects_init(Selects *selects, ...);
 void selects_append_aggfun(Selects *selects, AggFun * a);
+void selects_append_alias(Selects *selects, const char *name,const char *alias_name);
 void selects_append_attribute(Selects *selects, RelAttr *rel_attr);
 void selects_append_relation(Selects *selects, const char *relation_name);
 void selects_append_conditions(Selects *selects, Condition conditions[], size_t condition_num);

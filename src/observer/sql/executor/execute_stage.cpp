@@ -761,6 +761,9 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 {
   SelectStmt *select_stmt = (SelectStmt *)(sql_event->stmt());
   SessionEvent *session_event = sql_event->session_event();
+  // alias map
+  std::map<std::string,std::string> alias_set;
+  alias_set.swap(select_stmt->aliasset_);
   RC rc = RC::SUCCESS;
   // select mutiple tables happens here
   if (select_stmt->tables().size() > 1) {
@@ -806,7 +809,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
         j++;
       }
       accuse = j;
-      project_oper[j].add_projection(query_fields[i].table(), query_fields[i].meta(), true);
+      project_oper[j].add_projection(query_fields[i].table(), query_fields[i].meta(), alias_set,true);
       m[std::string(query_fields[i].table()->name())] = &project_oper[j];
     }
     project_oper.resize(accuse + 1);
@@ -828,7 +831,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     ProjectOperator project_oper;
     project_oper.add_child(&pred_oper);
     for (int i = 0; i < funs.size(); ++i) {
-      project_oper.add_projection(funs[i].second.table(), funs[i].second.meta());
+      project_oper.add_projection(funs[i].second.table(), funs[i].second.meta(),alias_set,false);
     }
     rc = project_oper.open();
     if (rc != RC::SUCCESS) {
@@ -900,7 +903,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   ProjectOperator project_oper;
   project_oper.add_child(&pred_oper);
   for (const Field &field : select_stmt->query_fields()) {
-    project_oper.add_projection(field.table(), field.meta());
+    project_oper.add_projection(field.table(), field.meta(),alias_set);
   }
   rc = project_oper.open();
   if (rc != RC::SUCCESS) {
@@ -1163,6 +1166,8 @@ void agg_result(std::vector<std::pair<int,int>> &ret, const std::vector<std::pai
 RC do_update_select(SelectStmt *select_stmt, SessionEvent *session_event, std::vector<Value> &out_value) {
   RC rc = RC::SUCCESS;
   // agg fun happens here
+  std::map<std::string,std::string> alias_set;
+  alias_set.swap(select_stmt->aliasset_);
   if (select_stmt->funs().size() != 0) {
     auto funs = select_stmt->funs();
     if (funs.size() != 1) {
@@ -1175,7 +1180,7 @@ RC do_update_select(SelectStmt *select_stmt, SessionEvent *session_event, std::v
     ProjectOperator project_oper;
     project_oper.add_child(&pred_oper);
     for (int i = 0; i < funs.size(); ++i) {
-      project_oper.add_projection(funs[i].second.table(), funs[i].second.meta());
+      project_oper.add_projection(funs[i].second.table(), funs[i].second.meta(),alias_set);
     }
     rc = project_oper.open();
     if (rc != RC::SUCCESS) {
@@ -1217,7 +1222,7 @@ RC do_update_select(SelectStmt *select_stmt, SessionEvent *session_event, std::v
   ProjectOperator project_oper;
   project_oper.add_child(&pred_oper);
   for (const Field &field : select_stmt->query_fields()) {
-    project_oper.add_projection(field.table(), field.meta());
+    project_oper.add_projection(field.table(), field.meta(),alias_set);
   }
   rc = project_oper.open();
   if (rc != RC::SUCCESS) {
