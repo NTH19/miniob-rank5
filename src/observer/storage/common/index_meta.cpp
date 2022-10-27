@@ -21,15 +21,17 @@ See the Mulan PSL v2 for more details. */
 #include "json/json.h"
 
 const static Json::StaticString INDEX_NAME("name");
+const static Json::StaticString INDEX_UNIQUE("unique");
 const static Json::StaticString INDEX_FIELDS("fileds");
 
-RC IndexMeta::init(const char *name, const std::vector<const FieldMeta *> &fields)
+RC IndexMeta::init(const char *name, const std::vector<const FieldMeta *> &fields, bool unique)
 {
   if (common::is_blank(name)) {
     LOG_ERROR("Failed to init index, name is empty.");
     return RC::INVALID_ARGUMENT;
   }
 
+  unique_ = unique;
   name_ = name;
   fields_.clear();
   for (const FieldMeta* field: fields) {
@@ -38,9 +40,14 @@ RC IndexMeta::init(const char *name, const std::vector<const FieldMeta *> &field
   return RC::SUCCESS;
 }
 
+bool IndexMeta::unique() const {
+  return unique_;
+}
+
 void IndexMeta::to_json(Json::Value &json_value) const
 {
   json_value[INDEX_NAME] = name_;
+  json_value[INDEX_UNIQUE] = Json::Value(unique_);
   Json::Value fileds;
   for(const std::string &field : fields_) {
     fileds.append(Json::Value(field));
@@ -52,6 +59,8 @@ RC IndexMeta::from_json(const TableMeta &table, const Json::Value &json_value, I
 {
   const Json::Value &name_value = json_value[INDEX_NAME];
   const Json::Value &field_value = json_value[INDEX_FIELDS];
+  const Json::Value &unique_value = json_value[INDEX_UNIQUE];
+
   if (!name_value.isString()) {
     LOG_ERROR("Index name is not a string. json value=%s", name_value.toStyledString().c_str());
     return RC::GENERIC_ERROR;
@@ -59,6 +68,11 @@ RC IndexMeta::from_json(const TableMeta &table, const Json::Value &json_value, I
 
   if (!field_value.isArray()) {
     LOG_ERROR("Field name of index [%s] is not an array", name_value.asCString());
+    return RC::GENERIC_ERROR;
+  }
+
+  if(!unique_value.isBool()) {
+    LOG_ERROR("unique of index [%s] is not a bool", name_value.asCString());
     return RC::GENERIC_ERROR;
   }
 
@@ -78,7 +92,7 @@ RC IndexMeta::from_json(const TableMeta &table, const Json::Value &json_value, I
     fields[i] = field;
   }
 
-  return index.init(name_value.asCString(), fields);
+  return index.init(name_value.asCString(), fields, unique_value.asBool());
 }
 
 const char *IndexMeta::name() const

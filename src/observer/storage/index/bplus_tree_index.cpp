@@ -114,6 +114,21 @@ char *BplusTreeIndex::make_userkey(const char *record) const {
 RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
 {
   char *user_key = make_userkey(record);
+  if(index_meta_.unique() && !index_handler_.is_empty()) {
+    std::list<RID> rids;
+    RC rc = index_handler_.get_entry(user_key, index_handler_.attr_length(), rids);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to get index entry: %s", strrc(rc));
+      delete[] user_key;
+      return rc;
+    }
+
+    if(!rids.empty()) {
+      delete[] user_key;
+      return RC::RECORD_DUPLICATE_KEY;
+    }
+  }
+
   RC rc = index_handler_.insert_entry(user_key, rid);
   delete[] user_key;
   return rc;
@@ -127,24 +142,18 @@ RC BplusTreeIndex::delete_entry(const char *record, const RID *rid)
   return rc;
 }
 RC BplusTreeIndex::update_entry(const char *record, const RID *rid, const char *new_data) {
-  char *old_key = make_userkey(record);
-  char *new_key = make_userkey(new_data);
-  RC rc = index_handler_.delete_entry(old_key, rid);
+  RC rc = delete_entry(record, rid);
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to update entry when deleting old entry.");
-    delete[] old_key;
-    delete[] new_key;
     return rc;    
   }
-  rc = index_handler_.insert_entry(new_key, rid);
+  rc = insert_entry(new_data, rid);
   if (rc != RC::SUCCESS) {
-    RC rc2 = index_handler_.insert_entry(old_key, rid);
+    RC rc2 = insert_entry(record, rid);
     if (rc2 != RC::SUCCESS) {
       LOG_ERROR("Failed to reinsert old entry");
     }
   }
-  delete[] old_key;
-  delete[] new_key;
   return rc;
 }
 IndexScanner *BplusTreeIndex::create_scanner(const char *left_key, int left_len, bool left_inclusive,

@@ -120,6 +120,7 @@ ParserContext *get_context(yyscan_t scanner)
 		IS
 		NULLL
 		NULLABLE
+		UNIQUE
 
 %union {
   struct _Attr *attr;
@@ -240,7 +241,12 @@ create_index:		/*create index 语句的语法解析树*/
     CREATE INDEX ID ON ID LBRACE index_attr index_attr_list RBRACE SEMICOLON 
 		{
 			CONTEXT->ssql->flag = SCF_CREATE_INDEX;//"create_index";
-			create_index_init(&CONTEXT->ssql->sstr.create_index, $3, $5);
+			create_index_init(&CONTEXT->ssql->sstr.create_index, $3, $5, 0);
+		}
+	| CREATE UNIQUE INDEX ID ON ID LBRACE index_attr index_attr_list RBRACE SEMICOLON 
+		{
+			CONTEXT->ssql->flag = SCF_CREATE_INDEX;//"create_index";
+			create_index_init(&CONTEXT->ssql->sstr.create_index, $4, $6, 1);
 		}
     ;
 

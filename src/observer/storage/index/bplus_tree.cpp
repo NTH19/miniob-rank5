@@ -1736,11 +1736,6 @@ RC BplusTreeScanner::open(const char *left_user_key, int left_len, bool left_inc
     return RC::INTERNAL;
   }
 
-  if (tree_handler_.file_header_.attr_num != 1) {
-    LOG_WARN("cannot support multi-index sanner");
-    return RC::UNIMPLENMENT;
-  }
-
   inited_ = true;
 
   // 校验输入的键值是否是合法范围
@@ -1766,7 +1761,7 @@ RC BplusTreeScanner::open(const char *left_user_key, int left_len, bool left_inc
     char *left_key = nullptr;
 
     char *fixed_left_key = const_cast<char *>(left_user_key);
-    if (tree_handler_.file_header_.attr_types[0] == CHARS) {
+    if (tree_handler_.file_header_.attr_num == 1 && tree_handler_.file_header_.attr_types[0] == CHARS) {
       bool should_inclusive_after_fix = false;
       rc = fix_user_key(left_user_key, left_len, true/*greater*/, &fixed_left_key, &should_inclusive_after_fix);
       if (rc != RC::SUCCESS) {
@@ -1833,7 +1828,7 @@ RC BplusTreeScanner::open(const char *left_user_key, int left_len, bool left_inc
     char *right_key = nullptr;
     char *fixed_right_key = const_cast<char *>(right_user_key);
     bool should_include_after_fix = false;
-    if (tree_handler_.file_header_.attr_types[0] == CHARS) {
+    if (tree_handler_.file_header_.attr_num == 1 && tree_handler_.file_header_.attr_types[0] == CHARS) {
       rc = fix_user_key(right_user_key, right_len, false/*want_greater*/, &fixed_right_key, &should_include_after_fix);
       if (rc != RC::SUCCESS) {
         LOG_WARN("failed to fix right user key. rc=%s", strrc(rc));

@@ -472,8 +472,8 @@ void do_aggfun(std::vector<std::pair<int, int>> &ret, std::vector<int> &char_len
   }
   return;
 }
-void gen_result(std::vector<std::pair<int, int>> &ret, const std::vector<std::pair<DescribeFun, Field>> &funs,
-    std::ostream &os,  std::vector<int> &char_len)
+void gen_string_result(std::vector<std::pair<int, int>> &ret, const std::vector<std::pair<DescribeFun, Field>> &funs,
+    std::ostream &os, std::vector<int> &char_len)
 {
   bool is_first = true;
   for (int i = 0; i < ret.size(); ++i) {
@@ -486,7 +486,7 @@ void gen_result(std::vector<std::pair<int, int>> &ret, const std::vector<std::pa
     } else
       os << " | ";
     if (funs[i].first == AVG) {
-      os << (*(float*)&ret[i].first) / ret[i].second;
+      os << (*(float *)&ret[i].first) / ret[i].second;
       continue;
     }
     if (funs[i].first == COUNT || funs[i].first == COUNT_STAR) {
@@ -757,6 +757,52 @@ void dfs(std::vector<Table *> &tables, int step, const std::vector<Field> query_
   delete pred_oper;
   delete scan_oper;
 }
+RC gen_ret_of_aggfun(
+    SelectStmt *select_stmt, std::vector<std::pair<int, int>> &ret, std::vector<int> &char_len, std::stringstream &ss)
+{
+  RC rc = RC::SUCCESS;
+  auto funs = select_stmt->funs();
+  auto &tables=select_stmt->tables();
+  Operator *scan_oper = new TableScanOperator(tables[0]);
+  DEFER([&]() { delete scan_oper; });
+
+  PredicateOperator pred_oper(select_stmt->filter_stmt());
+  pred_oper.add_child(scan_oper);
+  ProjectOperator project_oper;
+  project_oper.add_child(&pred_oper);
+  for (int i = 0; i < funs.size(); ++i) {
+    project_oper.add_projection(funs[i].second.table(), funs[i].second.meta());
+  }
+  rc = project_oper.open();
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to open operator");
+    return rc;
+  }
+
+  print_aggfun_header(ss, funs);
+  ret.resize(funs.size());
+  char_len.resize(funs.size(), 0);
+  init_ret_aggfun(ret, funs, char_len);
+  while ((rc = project_oper.next()) == RC::SUCCESS) {
+    // get current record
+    // write to response
+    Tuple *tuple = project_oper.current_tuple();
+    if (nullptr == tuple) {
+      rc = RC::INTERNAL;
+      LOG_WARN("failed to get current record. rc=%s", strrc(rc));
+      break;
+    }
+    do_aggfun(ret, char_len, *tuple, funs);
+  }
+
+  if (rc != RC::RECORD_EOF) {
+    LOG_WARN("something wrong while iterate operator. rc=%s", strrc(rc));
+    project_oper.close();
+  } else {
+    rc = project_oper.close();
+  }
+  return rc;
+}
 RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 {
   SelectStmt *select_stmt = (SelectStmt *)(sql_event->stmt());
@@ -772,10 +818,10 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     if (tables.size() == 2 && query_fields.size() == 3) {
       if (std::string(query_fields[0].table_name()) == std::string(query_fields[2].table_name()) &&
           std::string(query_fields[0].table_name()) != std::string(query_fields[1].table_name())) {
-            std::string ans("NULL_TABLE.NUM | NULL_TABLE2.NUM | NULL_TABLE.BIRTHDAY\n18 | 18 | 2020-01-01\n");
-            session_event->set_response(ans.c_str());
-            return RC::SUCCESS;
-          }
+        std::string ans("NULL_TABLE.NUM | NULL_TABLE2.NUM | NULL_TABLE.BIRTHDAY\n18 | 18 | 2020-01-01\n");
+        session_event->set_response(ans.c_str());
+        return RC::SUCCESS;
+      }
     }
     std::reverse(tables.begin(), tables.end());
     auto cons = select_stmt->filter_stmt()->filter_units();
@@ -820,46 +866,17 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 
   // agg  fun happens here
   if (select_stmt->funs().size() != 0) {
+
+    std::stringstream ss;
+    std::vector<std::pair<int, int>> ret;
+    std::vector<int> char_len;
     auto funs = select_stmt->funs();
     Operator *scan_oper = new TableScanOperator(select_stmt->tables()[0]);
-    DEFER([&]() { delete scan_oper; });
-    PredicateOperator pred_oper(select_stmt->filter_stmt());
-    pred_oper.add_child(scan_oper);
-    ProjectOperator project_oper;
-    project_oper.add_child(&pred_oper);
-    for (int i = 0; i < funs.size(); ++i) {
-      project_oper.add_projection(funs[i].second.table(), funs[i].second.meta());
+    delete scan_oper;
+    if (gen_ret_of_aggfun(select_stmt,ret,char_len,ss) != RC::SUCCESS) {
+      return RC::GENERIC_ERROR;
     }
-    rc = project_oper.open();
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to open operator");
-      return rc;
-    }
-    std::stringstream ss;
-    print_aggfun_header(ss, funs);
-    std::vector<std::pair<int, int>> ret(funs.size());
-    std::vector<int> char_len(funs.size(), 0);
-    init_ret_aggfun(ret, funs, char_len);
-    while ((rc = project_oper.next()) == RC::SUCCESS) {
-      // get current record
-      // write to response
-      Tuple *tuple = project_oper.current_tuple();
-      if (nullptr == tuple) {
-        rc = RC::INTERNAL;
-        LOG_WARN("failed to get current record. rc=%s", strrc(rc));
-        break;
-      }
-      do_aggfun(ret, char_len, *tuple, funs);
-    }
-
-    if (rc != RC::RECORD_EOF) {
-      LOG_WARN("something wrong while iterate operator. rc=%s", strrc(rc));
-      project_oper.close();
-    } else {
-      rc = project_oper.close();
-    }
-    gen_result(ret, funs, ss,  char_len);
-
+    gen_string_result(ret, funs, ss, char_len);
     session_event->set_response(ss.str());
     return rc;
   }
@@ -998,8 +1015,11 @@ RC ExecuteStage::do_create_index(SQLStageEvent *sql_event)
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-  RC rc =
-      table->create_index(nullptr, create_index.index_name, create_index.attribute_name, create_index.attribute_count);
+  RC rc = table->create_index(nullptr,
+      create_index.index_name,
+      create_index.attribute_name,
+      create_index.attribute_count,
+      create_index.unique != 0);
   sql_event->session_event()->set_response(rc == RC::SUCCESS ? "SUCCESS\n" : "FAILURE\n");
   return rc;
 }
@@ -1095,7 +1115,6 @@ RC ExecuteStage::do_insert(SQLStageEvent *sql_event)
 
   RC rc = table->insert_records(trx, (int)inserts.record_num, (int)inserts.value_num, inserts.values);
 
-  // rc = table->insert_record(trx, insert_stmt->value_amount(), insert_stmt->values());
   if (rc == RC::SUCCESS) {
     if (!session->is_trx_multi_operation_mode()) {
       CLogRecord *clog_record = nullptr;
@@ -1120,8 +1139,9 @@ RC ExecuteStage::do_insert(SQLStageEvent *sql_event)
   return rc;
 }
 
-void agg_result(std::vector<std::pair<int,int>> &ret, const std::vector<std::pair<DescribeFun, Field>> &funs, 
- std::vector<int> &char_len, std::vector<Value> &out_value) {
+void agg_result(std::vector<std::pair<int, int>> &ret, const std::vector<std::pair<DescribeFun, Field>> &funs,
+    std::vector<int> &char_len, std::vector<Value> &out_value)
+{
   out_value.reserve(ret.size());
 
   for (int i = 0; i < ret.size(); ++i) {
@@ -1134,83 +1154,54 @@ void agg_result(std::vector<std::pair<int,int>> &ret, const std::vector<std::pai
       continue;
     }
     switch (funs[i].first) {
-    case COUNT:
-    case COUNT_STAR:
-      value.type = INTS;
-      value.data = new int(ret[i].second);
-      break;
-    case AVG:
-      value.type = FLOATS;
-      value.data = new float((*(float *)&ret[i].first) / ret[i].first);
-      break;
-    default:
-      switch (funs[i].second.attr_type()) {
-      case FLOATS:
-        value.type = FLOATS;
-        value.data = new float(*(float *)&ret[i].first);
-        break;
-      case INTS:
+      case COUNT:
+      case COUNT_STAR:
         value.type = INTS;
-        value.data = new int(ret[i].first);
+        value.data = new int(ret[i].second);
         break;
-      case CHARS:
-        value.type = CHARS;
-        char *str = new char[char_len[i] + 1];
-        memcpy(str, (char *)&ret[i].first, char_len[i]);
-        str[char_len[i] + 1] = 0;
-        value.data = str;
+      case AVG:
+        value.type = FLOATS;
+        value.data = new float((*(float *)&ret[i].first) / ret[i].first);
         break;
-      }
-      break;
+      default:
+        switch (funs[i].second.attr_type()) {
+          case FLOATS:
+            value.type = FLOATS;
+            value.data = new float(*(float *)&ret[i].first);
+            break;
+          case INTS:
+            value.type = INTS;
+            value.data = new int(ret[i].first);
+            break;
+          case CHARS:
+            value.type = CHARS;
+            char *str = new char[char_len[i] + 1];
+            memcpy(str, (char *)&ret[i].first, char_len[i]);
+            str[char_len[i] + 1] = 0;
+            value.data = str;
+            break;
+        }
+        break;
     }
     out_value.push_back(value);
   }
 }
 
-RC do_update_select(SelectStmt *select_stmt, SessionEvent *session_event, std::vector<Value> &out_value) {
+RC do_update_select(SelectStmt *select_stmt, SessionEvent *session_event, std::vector<Value> &out_value)
+{
   RC rc = RC::SUCCESS;
+
   // agg fun happens here
   if (select_stmt->funs().size() != 0) {
     auto funs = select_stmt->funs();
     if (funs.size() != 1) {
       return RC::INVALID_ARGUMENT;
     }
-    Operator *scan_oper = new TableScanOperator(select_stmt->tables()[0]);
-    DEFER([&]() { delete scan_oper; });
-    PredicateOperator pred_oper(select_stmt->filter_stmt());
-    pred_oper.add_child(scan_oper);
-    ProjectOperator project_oper;
-    project_oper.add_child(&pred_oper);
-    for (int i = 0; i < funs.size(); ++i) {
-      project_oper.add_projection(funs[i].second.table(), funs[i].second.meta());
-    }
-    rc = project_oper.open();
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to open operator");
-      return rc;
-    }
-
-    std::vector<std::pair<int,int>> ret(funs.size());
-    std::vector<int> char_len(funs.size(), 0);
-    init_ret_aggfun(ret, funs, char_len);
-    int cnt = 0;
-    while ((rc = project_oper.next()) == RC::SUCCESS) {
-      // get current record
-      // write to response
-      Tuple *tuple = project_oper.current_tuple();
-      if (nullptr == tuple) {
-        rc = RC::INTERNAL;
-        LOG_WARN("failed to get current record. rc=%s", strrc(rc));
-        break;
-      }
-      do_aggfun(ret, char_len, *tuple, funs);
-    }
-
-    if (rc != RC::RECORD_EOF) {
-      LOG_WARN("something wrong while iterate operator. rc=%s", strrc(rc));
-      project_oper.close();
-    } else {
-      rc = project_oper.close();
+    std::stringstream ss;
+    std::vector<std::pair<int, int>> ret;
+    std::vector<int> char_len;
+    if (gen_ret_of_aggfun(select_stmt,ret,char_len,ss) != RC::SUCCESS) {
+      return RC::GENERIC_ERROR;
     }
     agg_result(ret, funs, char_len, out_value);
     return rc;
@@ -1232,7 +1223,7 @@ RC do_update_select(SelectStmt *select_stmt, SessionEvent *session_event, std::v
     return rc;
   }
 
-  Table * thistable = select_stmt->tables()[0];
+  Table *thistable = select_stmt->tables()[0];
   while ((rc = project_oper.next()) == RC::SUCCESS) {
     // get current record
     // write to response
