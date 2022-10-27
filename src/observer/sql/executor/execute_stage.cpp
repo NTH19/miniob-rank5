@@ -762,7 +762,7 @@ RC gen_ret_of_aggfun(
 {
   RC rc = RC::SUCCESS;
   auto funs = select_stmt->funs();
-  auto tables=select_stmt->tables();
+  auto &tables=select_stmt->tables();
   Operator *scan_oper = new TableScanOperator(tables[0]);
   DEFER([&]() { delete scan_oper; });
 
@@ -801,6 +801,7 @@ RC gen_ret_of_aggfun(
   } else {
     rc = project_oper.close();
   }
+  return rc;
 }
 RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 {
@@ -870,6 +871,8 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     std::vector<std::pair<int, int>> ret;
     std::vector<int> char_len;
     auto funs = select_stmt->funs();
+    Operator *scan_oper = new TableScanOperator(select_stmt->tables()[0]);
+    delete scan_oper;
     if (gen_ret_of_aggfun(select_stmt,ret,char_len,ss) != RC::SUCCESS) {
       return RC::GENERIC_ERROR;
     }
