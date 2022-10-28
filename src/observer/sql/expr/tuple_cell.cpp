@@ -58,13 +58,13 @@ void memcp_for_min(void* dst,void* cmp,int accro){
 }
 void TupleCell::do_aggfun(std::pair<int,int>&ret,DescribeFun des,int& char_len)const {
   int res=0;
-  if (check_null()&& des!=COUNT_STAR) return;
+  if (check_null() && des != COUNT_STAR) return;
   ret.second++;
   switch (this->attr_type_) {
-  case INTS: res= compare_int(this->data_, (void*)&ret.first);break;
-  case FLOATS: res= compare_float(this->data_, (void*)&ret.first);break;
-  case DATES: res= compare_int(this->data_, (void*)&ret.first);break;
-  case CHARS: res=compare_string(this->data_, this->length_, (void*)&ret.first,char_len);
+  case INTS: res = compare_int(this->data_, (void*)&ret.first); break;
+  case FLOATS: res = compare_float(this->data_, (void*)&ret.first); break;
+  case DATES: res = compare_int(this->data_, (void*)&ret.first); break;
+  case CHARS: res = compare_string(this->data_, this->length_, (void*)&ret.first,char_len);
   break;
   }
   //to do :reduce the code
@@ -78,6 +78,10 @@ void TupleCell::do_aggfun(std::pair<int,int>&ret,DescribeFun des,int& char_len)c
     case MIN:
       ret.first=res<0?*(int*)this->data_:ret.first;
       char_len=ret.first==*(int*)this->data_?this->length_:char_len;
+      break;
+    case AVG:
+      float num = atof(static_cast<const char *>(this->data_));
+      *(float*)&ret.first += num;
       break;
     }
     return ;

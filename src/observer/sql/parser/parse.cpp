@@ -41,6 +41,7 @@ void relation_attr_destroy(RelAttr *relation_attr)
   relation_attr->attribute_name = nullptr;
 }
 void value_init_null(Value *value) {
+  value->data = nullptr;
   value->type = UNDEFINED;
   value->_is_null = 1;
 }
@@ -149,7 +150,19 @@ void selects_append_aggfun(Selects *selects, AggFun * a)
 {
   selects->aggFun[selects->aggfun_num++]=*a;
 }
-
+void selects_append_alias(Selects *selects, const char *relation_name,const char * attr_name,const char* alias)
+{
+  selects->real_name[selects->alias_num]=strdup((new std::string(relation_name))->append(".").append(attr_name).c_str());
+  selects->alias_name[selects->alias_num]=strdup(alias);
+  selects->alias_num++;
+}
+void selects_append_alias(Selects *selects, AggFun * a,const char* alias)
+{
+  char* i=(char*)&(a->des);
+  selects->real_name[selects->alias_num]=strdup((new std::string(i))->append(".").append(a->attr.attribute_name).c_str());
+  selects->alias_name[selects->alias_num]=strdup(alias);
+  selects->alias_num++;
+}
 void selects_append_alias(Selects *selects, const char * name,const char* alias)
 {
   selects->real_name[selects->alias_num]=strdup(name);
@@ -304,7 +317,6 @@ void updates_init(Updates *updates, const char *relation_name, Condition conditi
 
 void updates_destroy(Updates *updates)
 {
-  sizeof(Updates);
   free(updates->relation_name);
   updates->relation_name = nullptr;
   
@@ -358,9 +370,10 @@ void drop_table_destroy(DropTable *drop_table)
   drop_table->relation_name = nullptr;
 }
 
-void create_index_init(
-    CreateIndex *create_index, const char *index_name, const char *relation_name)
+void create_index_init(CreateIndex *create_index, const char *index_name, 
+                        const char *relation_name, int unique)
 {
+  create_index->unique = unique;
   create_index->index_name = strdup(index_name);
   create_index->relation_name = strdup(relation_name);
 }

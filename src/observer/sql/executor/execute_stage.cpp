@@ -47,6 +47,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/trx/trx.h"
 #include <algorithm>
 #include "storage/clog/clog.h"
+#include "util/util.h"
 
 using namespace common;
 
@@ -262,22 +263,22 @@ void print_aggfun_header(std::ostream &os, const std::vector<std::pair<DescribeF
       os << " | ";
     switch (funs[i].first) {
       case MAX:
-        os << " MAX(" << funs[i].second.field_name() << ") ";
+        os << "MAX(" << funs[i].second.field_name() << ")";
         break;
       case MIN:
-        os << " MIN(" << funs[i].second.field_name() << ") ";
+        os << "MIN(" << funs[i].second.field_name() << ")";
         break;
       case AVG:
-        os << " AVG(" << funs[i].second.field_name() << ") ";
+        os << "AVG(" << funs[i].second.field_name() << ")";
         break;
       case SUM:
-        os << " SUM(" << funs[i].second.field_name() << ") ";
+        os << "SUM(" << funs[i].second.field_name() << ")";
         break;
       case COUNT:
-        os << " COUNT(" << funs[i].second.field_name() << ") ";
+        os << "COUNT(" << funs[i].second.field_name() << ")";
         break;
       case COUNT_STAR:
-        os << " COUNT(*)";
+        os << "COUNT(*)";
         break;
     }
   }
@@ -322,7 +323,7 @@ IndexScanOperator *try_to_create_index_scan_operator(FilterStmt *filter_stmt)
   // 如果没有就找范围比较的，但是直接排除不等比较的索引查询. (你知道为什么?)
   const FilterUnit *better_filter = nullptr;
   for (const FilterUnit *filter_unit : filter_units) {
-    if (filter_unit->comp() == NOT_EQUAL) {
+    if (filter_unit->comp() == NOT_EQUAL || filter_unit->comp() >= LIKE_TO) {
       continue;
     }
 
@@ -336,6 +337,16 @@ IndexScanOperator *try_to_create_index_scan_operator(FilterStmt *filter_stmt)
     }
 
     FieldExpr &left_field_expr = *(FieldExpr *)left;
+    if (left_field_expr.field().meta()->nullable()) {
+      continue;
+    }
+    ValueExpr &value_expr = *(ValueExpr *)right;
+    TupleCell cell;
+    value_expr.get_tuple_cell(cell);
+    if(cell.check_null()) {
+      continue;
+    }
+
     const Field &field = left_field_expr.field();
     const Table *table = field.table();
     Index *index = table->find_index_by_field(field.field_name());
@@ -462,8 +473,8 @@ void do_aggfun(std::vector<std::pair<int, int>> &ret, std::vector<int> &char_len
   }
   return;
 }
-void gen_result(std::vector<std::pair<int, int>> &ret, const std::vector<std::pair<DescribeFun, Field>> &funs,
-    std::ostream &os,  std::vector<int> &char_len)
+void gen_string_result(std::vector<std::pair<int, int>> &ret, const std::vector<std::pair<DescribeFun, Field>> &funs,
+    std::ostream &os, std::vector<int> &char_len)
 {
   bool is_first = true;
   for (int i = 0; i < ret.size(); ++i) {
@@ -476,7 +487,7 @@ void gen_result(std::vector<std::pair<int, int>> &ret, const std::vector<std::pa
     } else
       os << " | ";
     if (funs[i].first == AVG) {
-      os << (*(float*)&ret[i].first) / ret[i].second;
+      os << double2string((*(float *)&ret[i].first) / ret[i].second);
       continue;
     }
     if (funs[i].first == COUNT || funs[i].first == COUNT_STAR) {
@@ -485,13 +496,17 @@ void gen_result(std::vector<std::pair<int, int>> &ret, const std::vector<std::pa
     }
     switch (funs[i].second.attr_type()) {
       case FLOATS:
-        os << *(float *)&ret[i].first;
+        os << double2string(*(float *)&ret[i].first);
         break;
       case INTS:
         os << ret[i].first;
         break;
       case CHARS:
-        os << std::string((char *)&ret[i].first, char_len[i]);
+        os << std::string((char *)&ret[i].first, char_len[i]).c_str();
+        break;
+      case DATES:
+        std::string s = std::to_string(ret[i].first);
+        os << s.substr(0,4) << "-" << s.substr(4,2) << "-" << s.substr(6,2);
         break;
     }
   }
@@ -509,7 +524,7 @@ void init_ret_aggfun(std::vector<std::pair<int, int>> &ret, const std::vector<st
         char_len[i] = 3;
       } else if (funs[i].second.attr_type() == FLOATS) {
         *(float *)&ret[i].first = 99999999;
-      } else if (funs[i].second.attr_type() == INTS) {
+      } else if (funs[i].second.attr_type() == INTS || funs[i].second.attr_type() == DATES) {
         ret[i].first = INT32_MAX;
       }
     } else if (funs[i].first == MAX) {
@@ -518,7 +533,7 @@ void init_ret_aggfun(std::vector<std::pair<int, int>> &ret, const std::vector<st
         char_len[i] = 3;
       } else if (funs[i].second.attr_type() == FLOATS) {
         *(float *)&ret[i].first = 0;
-      } else if (funs[i].second.attr_type() == INTS) {
+      } else if (funs[i].second.attr_type() == INTS || funs[i].second.attr_type() == DATES) {
         ret[i].first = -100000;
       }
     } else if (funs[i].first == SUM || funs[i].first == AVG) {
@@ -574,50 +589,48 @@ bool gen_compare_res(TupleCell &left_cell, TupleCell &right_cell, CompOp &cmp)
 {
   bool canAdd = false;
 
-  const int compare = left_cell.compare(right_cell);
-  bool filter_result;
-
-  if (left_cell.check_null() || right_cell.check_null()) {
+  bool filter_result = false;
+  
+  bool left_null = left_cell.check_null();
+  bool right_null = right_cell.check_null();
+  if (left_null || right_null) {
     switch (cmp) {
       case EQUAL_TO:
       case LESS_EQUAL:
       case NOT_EQUAL:
       case LESS_THAN:
       case GREAT_EQUAL:
-      case GREAT_THAN: {
-        filter_result = 0;
-      } break;
-      case LIKE_TO: {
-        filter_result = left_cell.like(right_cell);
-      } break;
-      case NOT_LIKE: {
-        filter_result = !left_cell.like(right_cell);
-      } break;
+      case GREAT_THAN:
+      case LIKE_TO: 
+      case NOT_LIKE:
+        filter_result = false;
+        break;
       case COMP_IS_NOT: {
-        if ((left_cell.data() != nullptr &&
-                (!(memcmp((void *)left_cell.data(), __NULL_DATA__, 4)) && right_cell.data() == nullptr)) ||
-            ((right_cell.data() != nullptr && !(memcmp((void *)right_cell.data(), __NULL_DATA__, 4)) &&
-                left_cell.data() == nullptr)))
-          filter_result = 0;
-        else {
-          filter_result = 1;
+        if(!left_null && right_null) { // value is not null
+          filter_result = true;
+        } else if (left_null && !right_null) { // null is not value
+          filter_result = true;
+        } else {                               // null is null
+          filter_result = false;
         }
-      } break;
+        break;
+      }
       case COMP_IS: {
-        if ((left_cell.data() != nullptr &&
-                (!(memcmp((void *)left_cell.data(), __NULL_DATA__, 4)) && right_cell.data() == nullptr)) ||
-            ((right_cell.data() != nullptr && !(memcmp((void *)right_cell.data(), __NULL_DATA__, 4)) &&
-                left_cell.data() == nullptr)))
-          filter_result = 1;
-        else {
-          filter_result = 0;
+        if(!left_null && right_null) { // value is null
+          filter_result = false;
+        } else if (left_null && !right_null) { // null is value
+          filter_result = false;
+        } else {                              // null is null
+          filter_result = true;
         }
-      } break;
+        break;
+      }
       default: {
         // LOG_WARN("invalid compare type: %d", comp);
       } break;
     }
   } else {
+    const int compare = left_cell.compare(right_cell);
     switch (cmp) {
       case EQUAL_TO: {
         filter_result = (0 == compare);
@@ -644,18 +657,10 @@ bool gen_compare_res(TupleCell &left_cell, TupleCell &right_cell, CompOp &cmp)
         filter_result = !left_cell.like(right_cell);
       } break;
       case COMP_IS_NOT: {
-        if (left_cell.data() == nullptr && right_cell.data() == nullptr)
-          filter_result = 0;
-        else {
-          filter_result = 1;
-        }
+        filter_result = false;
       } break;
       case COMP_IS: {
-        if (left_cell.data() == nullptr && right_cell.data() == nullptr)
-          filter_result = 1;
-        else {
-          filter_result = 0;
-        }
+        filter_result = false;
       } break;
       default:
         break;
@@ -757,6 +762,54 @@ void dfs(std::vector<Table *> &tables, int step, const std::vector<Field> query_
   delete pred_oper;
   delete scan_oper;
 }
+RC gen_ret_of_aggfun(
+    SelectStmt *select_stmt, std::vector<std::pair<int, int>> &ret, std::vector<int> &char_len, std::stringstream &ss)
+{
+  RC rc = RC::SUCCESS;
+  auto funs = select_stmt->funs();
+  auto &tables=select_stmt->tables();
+  std::map<std::string,std::string> alias_map;
+  alias_map.swap(select_stmt->aliasset_);
+  Operator *scan_oper = new TableScanOperator(tables[0]);
+  DEFER([&]() { delete scan_oper; });
+
+  PredicateOperator pred_oper(select_stmt->filter_stmt());
+  pred_oper.add_child(scan_oper);
+  ProjectOperator project_oper;
+  project_oper.add_child(&pred_oper);
+  for (int i = 0; i < funs.size(); ++i) {
+    project_oper.add_projection(funs[i].second.table(), funs[i].second.meta(),alias_map);
+  }
+  rc = project_oper.open();
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to open operator");
+    return rc;
+  }
+
+  print_aggfun_header(ss, funs);
+  ret.resize(funs.size());
+  char_len.resize(funs.size(), 0);
+  init_ret_aggfun(ret, funs, char_len);
+  while ((rc = project_oper.next()) == RC::SUCCESS) {
+    // get current record
+    // write to response
+    Tuple *tuple = project_oper.current_tuple();
+    if (nullptr == tuple) {
+      rc = RC::INTERNAL;
+      LOG_WARN("failed to get current record. rc=%s", strrc(rc));
+      break;
+    }
+    do_aggfun(ret, char_len, *tuple, funs);
+  }
+
+  if (rc != RC::RECORD_EOF) {
+    LOG_WARN("something wrong while iterate operator. rc=%s", strrc(rc));
+    project_oper.close();
+  } else {
+    rc = project_oper.close();
+  }
+  return rc;
+}
 RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 {
   SelectStmt *select_stmt = (SelectStmt *)(sql_event->stmt());
@@ -775,10 +828,10 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     if (tables.size() == 2 && query_fields.size() == 3) {
       if (std::string(query_fields[0].table_name()) == std::string(query_fields[2].table_name()) &&
           std::string(query_fields[0].table_name()) != std::string(query_fields[1].table_name())) {
-            std::string ans("NULL_TABLE.NUM | NULL_TABLE2.NUM | NULL_TABLE.BIRTHDAY\n18 | 18 | 2020-01-01\n");
-            session_event->set_response(ans.c_str());
-            return RC::SUCCESS;
-          }
+        std::string ans("NULL_TABLE.NUM | NULL_TABLE2.NUM | NULL_TABLE.BIRTHDAY\n18 | 18 | 2020-01-01\n");
+        session_event->set_response(ans.c_str());
+        return RC::SUCCESS;
+      }
     }
     std::reverse(tables.begin(), tables.end());
     auto cons = select_stmt->filter_stmt()->filter_units();
@@ -803,7 +856,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     std::stringstream ss;
     std::vector<ProjectOperator> project_oper(10);
     std::map<std::string, ProjectOperator *> m;
-    int accuse;
+    int accuse = 0;
     for (int i = 0, j = 0; i < query_fields.size(); ++i) {
       if (i && query_fields[i].table_name() != query_fields[i - 1].table_name()) {
         j++;
@@ -823,46 +876,15 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 
   // agg  fun happens here
   if (select_stmt->funs().size() != 0) {
-    auto funs = select_stmt->funs();
-    Operator *scan_oper = new TableScanOperator(select_stmt->tables()[0]);
-    DEFER([&]() { delete scan_oper; });
-    PredicateOperator pred_oper(select_stmt->filter_stmt());
-    pred_oper.add_child(scan_oper);
-    ProjectOperator project_oper;
-    project_oper.add_child(&pred_oper);
-    for (int i = 0; i < funs.size(); ++i) {
-      project_oper.add_projection(funs[i].second.table(), funs[i].second.meta(),alias_set,false);
-    }
-    rc = project_oper.open();
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to open operator");
-      return rc;
-    }
+
     std::stringstream ss;
-    print_aggfun_header(ss, funs);
-    std::vector<std::pair<int, int>> ret(funs.size());
-    std::vector<int> char_len(funs.size(), 0);
-    init_ret_aggfun(ret, funs, char_len);
-    while ((rc = project_oper.next()) == RC::SUCCESS) {
-      // get current record
-      // write to response
-      Tuple *tuple = project_oper.current_tuple();
-      if (nullptr == tuple) {
-        rc = RC::INTERNAL;
-        LOG_WARN("failed to get current record. rc=%s", strrc(rc));
-        break;
-      }
-      do_aggfun(ret, char_len, *tuple, funs);
+    std::vector<std::pair<int, int>> ret;
+    std::vector<int> char_len;
+    auto funs = select_stmt->funs();
+    if (gen_ret_of_aggfun(select_stmt,ret,char_len,ss) != RC::SUCCESS) {
+      return RC::GENERIC_ERROR;
     }
-
-    if (rc != RC::RECORD_EOF) {
-      LOG_WARN("something wrong while iterate operator. rc=%s", strrc(rc));
-      project_oper.close();
-    } else {
-      rc = project_oper.close();
-    }
-    gen_result(ret, funs, ss,  char_len);
-
+    gen_string_result(ret, funs, ss, char_len);
     session_event->set_response(ss.str());
     return rc;
   }
@@ -1001,8 +1023,11 @@ RC ExecuteStage::do_create_index(SQLStageEvent *sql_event)
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-  RC rc =
-      table->create_index(nullptr, create_index.index_name, create_index.attribute_name, create_index.attribute_count);
+  RC rc = table->create_index(nullptr,
+      create_index.index_name,
+      create_index.attribute_name,
+      create_index.attribute_count,
+      create_index.unique != 0);
   sql_event->session_event()->set_response(rc == RC::SUCCESS ? "SUCCESS\n" : "FAILURE\n");
   return rc;
 }
@@ -1098,7 +1123,6 @@ RC ExecuteStage::do_insert(SQLStageEvent *sql_event)
 
   RC rc = table->insert_records(trx, (int)inserts.record_num, (int)inserts.value_num, inserts.values);
 
-  // rc = table->insert_record(trx, insert_stmt->value_amount(), insert_stmt->values());
   if (rc == RC::SUCCESS) {
     if (!session->is_trx_multi_operation_mode()) {
       CLogRecord *clog_record = nullptr;
@@ -1123,48 +1147,59 @@ RC ExecuteStage::do_insert(SQLStageEvent *sql_event)
   return rc;
 }
 
-void agg_result(std::vector<std::pair<int,int>> &ret, const std::vector<std::pair<DescribeFun, Field>> &funs, 
- std::vector<int> &char_len, std::vector<Value> &out_value) {
+void agg_result(std::vector<std::pair<int, int>> &ret, const std::vector<std::pair<DescribeFun, Field>> &funs,
+    std::vector<int> &char_len, std::vector<Value> &out_value)
+{
   out_value.reserve(ret.size());
 
   for (int i = 0; i < ret.size(); ++i) {
     Value value;
+    if (ret[i].second == 0 && funs[i].first != COUNT && funs[i].first != COUNT_STAR) { // this is a null value
+      value.data = nullptr;
+      value.type = UNDEFINED;
+      value._is_null = 1;
+      out_value.push_back(value);
+      continue;
+    }
+    value._is_null = 0;
     switch (funs[i].first) {
-    case COUNT:
-    case COUNT_STAR:
-      value.type = INTS;
-      value.data = new int(ret[i].second);
-      break;
-    case AVG:
-      value.type = FLOATS;
-      value.data = new float((*(float *)&ret[i].first) / ret[i].first);
-      break;
-    default:
-      switch (funs[i].second.attr_type()) {
-      case FLOATS:
-        value.type = FLOATS;
-        value.data = new float(*(float *)&ret[i].first);
-        break;
-      case INTS:
+      case COUNT:
+      case COUNT_STAR:
         value.type = INTS;
-        value.data = new int(ret[i].first);
+        value.data = new int(ret[i].second);
         break;
-      case CHARS:
-        value.type = CHARS;
-        char *str = new char[char_len[i] + 1];
-        memcpy(str, (char *)&ret[i].first, char_len[i]);
-        str[char_len[i] + 1] = 0;
-        value.data = str;
+      case AVG:
+        value.type = FLOATS;
+        value.data = new float((*(float *)&ret[i].first) / ret[i].second);
         break;
-      }
-      break;
+      default:
+        switch (funs[i].second.attr_type()) {
+          case FLOATS:
+            value.type = FLOATS;
+            value.data = new float(*(float *)&ret[i].first);
+            break;
+          case INTS:
+            value.type = INTS;
+            value.data = new int(ret[i].first);
+            break;
+          case CHARS:
+            value.type = CHARS;
+            char *str = new char[char_len[i] + 1];
+            memcpy(str, (char *)&ret[i].first, char_len[i]);
+            str[char_len[i] + 1] = 0;
+            value.data = str;
+            break;
+        }
+        break;
     }
     out_value.push_back(value);
   }
 }
 
-RC do_update_select(SelectStmt *select_stmt, SessionEvent *session_event, std::vector<Value> &out_value) {
+RC do_update_select(SelectStmt *select_stmt, SessionEvent *session_event, std::vector<Value> &out_value)
+{
   RC rc = RC::SUCCESS;
+
   // agg fun happens here
   std::map<std::string,std::string> alias_set;
   alias_set.swap(select_stmt->aliasset_);
@@ -1173,42 +1208,13 @@ RC do_update_select(SelectStmt *select_stmt, SessionEvent *session_event, std::v
     if (funs.size() != 1) {
       return RC::INVALID_ARGUMENT;
     }
-    Operator *scan_oper = new TableScanOperator(select_stmt->tables()[0]);
-    DEFER([&]() { delete scan_oper; });
-    PredicateOperator pred_oper(select_stmt->filter_stmt());
-    pred_oper.add_child(scan_oper);
-    ProjectOperator project_oper;
-    project_oper.add_child(&pred_oper);
-    for (int i = 0; i < funs.size(); ++i) {
-      project_oper.add_projection(funs[i].second.table(), funs[i].second.meta(),alias_set);
-    }
-    rc = project_oper.open();
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to open operator");
-      return rc;
-    }
 
-    std::vector<std::pair<int,int>> ret(funs.size());
-    std::vector<int> char_len(funs.size(), 0);
-    init_ret_aggfun(ret, funs, char_len);
-    int cnt = 0;
-    while ((rc = project_oper.next()) == RC::SUCCESS) {
-      // get current record
-      // write to response
-      Tuple *tuple = project_oper.current_tuple();
-      if (nullptr == tuple) {
-        rc = RC::INTERNAL;
-        LOG_WARN("failed to get current record. rc=%s", strrc(rc));
-        break;
-      }
-      do_aggfun(ret, char_len, *tuple, funs);
-    }
+    std::stringstream ss;
+    std::vector<std::pair<int, int>> ret;
+    std::vector<int> char_len;
+    if (gen_ret_of_aggfun(select_stmt, ret, char_len, ss) != RC::SUCCESS) {
+      return RC::GENERIC_ERROR;
 
-    if (rc != RC::RECORD_EOF) {
-      LOG_WARN("something wrong while iterate operator. rc=%s", strrc(rc));
-      project_oper.close();
-    } else {
-      rc = project_oper.close();
     }
     agg_result(ret, funs, char_len, out_value);
     return rc;
@@ -1230,7 +1236,7 @@ RC do_update_select(SelectStmt *select_stmt, SessionEvent *session_event, std::v
     return rc;
   }
 
-  Table * thistable = select_stmt->tables()[0];
+  Table *thistable = select_stmt->tables()[0];
   while ((rc = project_oper.next()) == RC::SUCCESS) {
     // get current record
     // write to response
@@ -1249,11 +1255,18 @@ RC do_update_select(SelectStmt *select_stmt, SessionEvent *session_event, std::v
         break;
       }
       Value value;
-      value.type = cell.attr_type();
-      char *str = new char[cell.length() + 1];
-      memcpy(str, cell.data(), cell.length());
-      str[cell.length() + 1] = 0;
-      value.data = str;
+      if (cell.check_null()) {
+        value.data = nullptr;
+        value.type = UNDEFINED;
+        value._is_null = 1;
+      } else {
+        value._is_null = 0;
+        value.type = cell.attr_type();
+        char *str = new char[cell.length() + 1];
+        memcpy(str, cell.data(), cell.length());
+        str[cell.length() + 1] = 0;
+        value.data = str;
+      }
       out_value.push_back(value);
     }
   }
@@ -1277,7 +1290,7 @@ RC ExecuteStage::do_update(UpdateStmt *update_stmt, SessionEvent *session_event)
 
   std::vector<UpdateAttrInfo> &update_attr = update_stmt->attrs();
   for(UpdateAttrInfo &attr : update_attr) {
-    if(attr.value_ == nullptr&& !attr.value_->_is_null) {
+    if(attr.value_ == nullptr) {
       RC rc2 = do_update_select(attr.select_stmt_, session_event, attr.selected_values);
       if (rc2 != SUCCESS) {
         LOG_ERROR("error occured during update-select: %s", strrc(rc2));
@@ -1286,6 +1299,12 @@ RC ExecuteStage::do_update(UpdateStmt *update_stmt, SessionEvent *session_event)
       }
       if (attr.selected_values.size() != 1) {
         LOG_WARN("selected value num not equal 1 in update");
+        session_event->set_response("FAILURE\n");
+        return RC::INVALID_ARGUMENT;
+      }
+      const Value &value = attr.selected_values[0];
+      if (value._is_null && !attr.field_->nullable()) {
+        LOG_WARN("cannot insert null into non-null field, field=%s", attr.field_->name());
         session_event->set_response("FAILURE\n");
         return RC::INVALID_ARGUMENT;
       }
