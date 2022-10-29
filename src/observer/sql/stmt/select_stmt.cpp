@@ -79,6 +79,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
   std::vector<Field> fun_fields(select_sql.aggfun_num);
   for (int i = select_sql.aggfun_num - 1; i >= 0; i--) {
     const RelAttr &relation_attr = select_sql.aggFun[i].attr;
+    const char * alias_name=select_sql.aggFun[i].alias_name;
     if (relation_attr.relation_name != nullptr &&
         !table_map.count(std::string(relation_attr.relation_name))) {
       LOG_WARN("invalid table name in aggregate: %s", relation_attr.relation_name);
@@ -90,6 +91,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
         return RC::SCHEMA_FIELD_MISSING;
       }
       fun_fields[i] = Field(tables[0], field_meta);
+      fun_fields[i].aliasname=alias_name;
     } else {
       if (tables.size() != 1) {
         LOG_WARN("invalid. I do not know the attr's table. attr=%s", relation_attr.attribute_name);
@@ -104,6 +106,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
       }
 
       fun_fields[i] = Field(table, field_meta);
+      fun_fields[i].aliasname=alias_name;
     }
     funs.push_back(std::pair<DescribeFun, Field>(select_sql.aggFun[i].des, fun_fields[i]));
   }
@@ -175,11 +178,12 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt)
   if (tables.size() == 1) {
     default_table = tables[0];
   }
-
+  
+  
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
   RC rc =
-      FilterStmt::create(db, default_table, &table_map, select_sql.conditions, select_sql.condition_num, filter_stmt);
+      FilterStmt::create(db, default_table, &table_map, select_sql.conditions, select_sql.condition_num, filter_stmt,alias_name_map);
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct filter stmt");
     return rc;

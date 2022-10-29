@@ -88,10 +88,12 @@ public:
 public:
   static RC create(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
 			const Condition *conditions, int condition_num,
-			FilterStmt *&stmt);
+			FilterStmt *&stmt,std::map<std::string,std::string> alias_name_map=std::map<std::string,std::string>());
 
   static RC create_filter_unit(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
-			       const Condition &condition, FilterUnit *&filter_unit);
+			       const Condition &condition, FilterUnit *&filter_unit,std::map<std::string,std::string> alias_name_map=std::map<std::string,std::string>());
+
+  std::map<std::string,std::string> alias_name_map;
 
 private:
   std::vector<FilterUnit *>  filter_units_; // 默认当前都是AND关系

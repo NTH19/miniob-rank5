@@ -150,13 +150,13 @@ void selects_append_aggfun(Selects *selects, AggFun * a)
 {
   selects->aggFun[selects->aggfun_num++]=*a;
 }
-void selects_append_alias(Selects *selects, const char *relation_name,const char * attr_name,const char* alias)
+void selects_append_alias2(Selects *selects, const char *relation_name,const char * attr_name,const char* alias)
 {
   selects->real_name[selects->alias_num]=strdup((new std::string(relation_name))->append(".").append(attr_name).c_str());
   selects->alias_name[selects->alias_num]=strdup(alias);
   selects->alias_num++;
 }
-void selects_append_alias(Selects *selects, AggFun * a,const char* alias)
+void selects_append_alias3(Selects *selects, AggFun * a,const char* alias)
 {
   char* i=(char*)&(a->des);
   selects->real_name[selects->alias_num]=strdup((new std::string(i))->append(".").append(a->attr.attribute_name).c_str());
@@ -173,8 +173,15 @@ void Init_AggFun(AggFun * a, DescribeFun des, const char* arr_name){
   a->attr.attribute_name = strdup(arr_name);
   a->des = des;
   a->attr.relation_name=nullptr;
+  a->alias_name=nullptr;
 }
+void Init_AggFun1(AggFun * a, DescribeFun des, const char* arr_name,const char * alias_name){
+  a->attr.attribute_name = strdup(arr_name);
+  a->des = des;
+  a->attr.relation_name=nullptr;
+  a->alias_name=alias_name;
 
+}
 void Init_AggFun_Rel(AggFun *a, DescribeFun des, const char* rel_name, const char* arr_name) {
   a->attr.relation_name = strdup(rel_name);
   a->attr.attribute_name = strdup(arr_name);

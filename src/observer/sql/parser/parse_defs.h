@@ -82,6 +82,7 @@ typedef struct _Condition {
 typedef struct {
   DescribeFun des;
   RelAttr attr;
+  const char * alias_name;
 } AggFun;
 
 // struct of select
@@ -246,12 +247,16 @@ void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, size_t
 void attr_info_destroy(AttrInfo *attr_info);
 
 void Init_AggFun(AggFun * a, DescribeFun des, const char* arr_name);
+void Init_AggFun1(AggFun * a, DescribeFun des, const char* arr_name,const char * alias_name);
 void Init_AggFun_Rel(AggFun *a, DescribeFun des, const char* rel_name, const char* arr_name);
 
 void selects_init(Selects *selects, ...);
 void selects_append_aggfun(Selects *selects, AggFun * a);
+
 void selects_append_alias(Selects *selects, const char *name,const char *alias_name);
-void selects_append_alias(Selects *selects, const char *name,const char *rname,const char *alias_name);
+void selects_append_alias2(Selects *selects, const char *name,const char *rname,const char *alias_name);
+void selects_append_alias3(Selects *selects, AggFun * a,const char* alias);
+
 void selects_append_attribute(Selects *selects, RelAttr *rel_attr);
 void selects_append_relation(Selects *selects, const char *relation_name);
 void selects_append_conditions(Selects *selects, Condition conditions[], size_t condition_num);

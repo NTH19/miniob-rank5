@@ -261,6 +261,8 @@ void print_aggfun_header(std::ostream &os, const std::vector<std::pair<DescribeF
   for (int i = 0; i < funs.size(); i++) {
     if (i != 0)
       os << " | ";
+    if (funs[i].second.aliasname!=nullptr) os<<funs[i].second.aliasname;
+    else{
     switch (funs[i].first) {
       case MAX:
         os << "MAX(" << funs[i].second.field_name() << ")";
@@ -280,6 +282,7 @@ void print_aggfun_header(std::ostream &os, const std::vector<std::pair<DescribeF
       case COUNT_STAR:
         os << "COUNT(*)";
         break;
+    }
     }
   }
   os << '\n';
@@ -858,11 +861,13 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     std::map<std::string, ProjectOperator *> m;
     int accuse = 0;
     for (int i = 0, j = 0; i < query_fields.size(); ++i) {
-      if (i && query_fields[i].table_name() != query_fields[i - 1].table_name()) {
+      auto name1=query_fields[i].table_name();
+       
+      if ( i>0 && query_fields[i].table_name() != query_fields[i - 1].table_name() ) {
         j++;
       }
       accuse = j;
-      project_oper[j].add_projection(query_fields[i].table(), query_fields[i].meta(), alias_set,true);
+      project_oper[j].add_projection(query_fields[i].table(), query_fields[i].meta(), alias_set,true);// must void only value copy,must reference copy!!!
       m[std::string(query_fields[i].table()->name())] = &project_oper[j];
     }
     project_oper.resize(accuse + 1);

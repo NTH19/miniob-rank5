@@ -59,7 +59,7 @@ Tuple *ProjectOperator::process_one_tuple(Tuple *t)
   return &tuple_;
 }
 void ProjectOperator::add_projection(
-    const Table *table, const FieldMeta *field_meta, std::map<std::string, std::string> alias_set, bool add_table)
+    const Table *table, const FieldMeta *field_meta, std::map<std::string, std::string>& alias_set, bool add_table)
 {
   // 对单表来说，展示的(alias) 字段总是字段名称，
   // 对多表查询来说，展示的alias 需要带表名字
@@ -75,19 +75,22 @@ void ProjectOperator::add_projection(
   } else {
     const char *field_name = nullptr;
     const char *table_name = nullptr;
-    auto alias1 = (std::string(table->name())).append(".").append(std::string(field_meta->name())).c_str();
+    if (j > 0)
+        table_name = alias_set[std::string(table->name())].c_str();
+      else
+        table_name = table->name();
+    std::string alias1 = (std::string(table_name)).append(".").append(std::string(field_meta->name()));
+    std::string alias2 = (std::string(table->name())).append(".").append(std::string(field_meta->name()));
 
     if (alias_set.count(alias1) > 0)
       spec->set_alias(alias_set[alias1].c_str());
+    else if (alias_set.count(alias2) > 0) spec->set_alias(alias_set[alias2].c_str());
     else {
       if (i > 0)
         field_name = alias_set[std::string(field_meta->name())].c_str();
       else
         field_name = field_meta->name();
-      if (j > 0)
-        table_name = alias_set[std::string(table->name())].c_str();
-      else
-        table_name = table->name();
+      
       spec->set_alias((new std::string(table_name))->append(".").append(field_name).c_str());
     }
   }
