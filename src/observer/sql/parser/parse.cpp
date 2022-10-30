@@ -89,11 +89,27 @@ void value_destroy(Value *value)
   value->data = nullptr;
   value->_is_null = 0;
 }
-
+void condition_init_with_query(Condition *condition, CompOp comp, RelAttr *left_attr,Selects *p){
+  condition->has_sel=1;
+  condition->comp=comp;
+  condition->value_num=0;
+  if(left_attr==NULL){
+    condition->left_is_attr=0;
+    condition->left_value=*(new Value());
+    condition->left_value.data=new int;
+    condition->left_value.type=INTS;
+  }else{
+  condition->left_is_attr=1;
+  condition->left_attr = *left_attr;
+  }
+  condition->right_is_attr=0;
+  condition->sel=p;
+}
 void condition_init(Condition *condition, CompOp comp, int left_is_attr, RelAttr *left_attr, Value *left_value,
     int right_is_attr, RelAttr *right_attr, Value *right_value)
 {
   condition->comp = comp;
+  condition->value_num=0;
   condition->left_is_attr = left_is_attr;
   if (left_is_attr) {
     condition->left_attr = *left_attr;
@@ -107,19 +123,20 @@ void condition_init(Condition *condition, CompOp comp, int left_is_attr, RelAttr
   } else {
     condition->right_value = *right_value;
   }
+  condition->has_sel=0;
 }
 void condition_destroy(Condition *condition)
 {
-  if (condition->left_is_attr) {
-    relation_attr_destroy(&condition->left_attr);
-  } else {
-    value_destroy(&condition->left_value);
-  }
-  if (condition->right_is_attr) {
-    relation_attr_destroy(&condition->right_attr);
-  } else {
-    value_destroy(&condition->right_value);
-  }
+  // if (condition->left_is_attr) {
+  //   relation_attr_destroy(&condition->left_attr);
+  // } else {
+  //   value_destroy(&condition->left_value);
+  // }
+  // if (condition->right_is_attr) {
+  //   relation_attr_destroy(&condition->right_attr);
+  // } else {
+  //   value_destroy(&condition->right_value);
+  // }
 }
 
 void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, size_t length, int nullable)
@@ -140,6 +157,18 @@ void selects_init(Selects *selects, ...);
 void selects_append_attribute(Selects *selects, RelAttr *rel_attr)
 {
   selects->attributes[selects->attr_num++] = *rel_attr;
+}
+void condition_init_cells_for_in(Condition*c, RelAttr *left_attr,Value values[], size_t value_num,CompOp cmp)
+{
+  c->left_is_attr = 1;
+  c->left_attr = *left_attr;
+  c->value_num=value_num;
+  c->right_is_attr=0;
+  c->has_sel=0;
+  c->comp=cmp;
+  for(int i=0;i<value_num;++i){
+    c->values[i]=values[i];
+  }
 }
 void selects_append_relation(Selects *selects, const char *relation_name)
 {

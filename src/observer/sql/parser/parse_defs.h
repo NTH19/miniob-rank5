@@ -40,7 +40,11 @@ typedef enum {
   NOT_LIKE,     //"not like"   
   COMP_IS_NOT,
   COMP_IS,       
-  NO_OP
+  NO_OP,
+  IN,
+  NOT_IN,
+  EXIST,
+  NOT_EXIST
 } CompOp;
 
 //属性值类型
@@ -68,7 +72,7 @@ typedef struct _Value {
   void *data;     // value
   int _is_null;
 } Value;
-
+struct _Selects;
 typedef struct _Condition {
   int left_is_attr;    // TRUE if left-hand side is an attribute
                        // 1时，操作符左边是属性名，0时，是属性值
@@ -79,14 +83,16 @@ typedef struct _Condition {
                        // 1时，操作符右边是属性名，0时，是属性值
   RelAttr right_attr;  // right-hand side attribute if right_is_attr = TRUE 右边的属性
   Value right_value;   // right-hand side value if right_is_attr = FALSE
+  int has_sel;
+  int value_num;
+  struct _Selects *sel;
+  Value  values[MAX_NUM];
 } Condition;
 typedef struct {
   DescribeFun des;
   RelAttr attr;
 } AggFun;
-
-// struct of select
-typedef struct {
+struct _Selects{
   size_t attr_num;                // Length of attrs in Select clause
   RelAttr attributes[MAX_NUM];    // attrs in Select clause
   size_t relation_num;            // Length of relations in Fro clause
@@ -95,9 +101,18 @@ typedef struct {
   size_t condition_num;           // Length of conditions in Where clause
   Condition conditions[MAX_NUM];  // conditions in Where clause
   AggFun aggFun[MAX_NUM];
+  struct _Selects *sub_query[MAX_NUM];
+  int sub_query_num;
   int need_Revere;
   int need_reverse_join;
-} Selects;
+  int dabiao;
+} ;
+typedef struct _Selects Selects;
+
+
+
+// struct of select
+
 
 // struct of insert
 typedef struct {

@@ -585,7 +585,7 @@ void p_mutiple_table_header(std::ostream &os, std::vector<ProjectOperator> &p, b
 
   os << "\n";
 }
-bool gen_compare_res(TupleCell &left_cell, TupleCell &right_cell, CompOp &cmp)
+bool gen_compare_res(TupleCell &left_cell, TupleCell &right_cell, CompOp cmp)
 {
   bool canAdd = false;
 
@@ -812,6 +812,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 {
   SelectStmt *select_stmt = (SelectStmt *)(sql_event->stmt());
   SessionEvent *session_event = sql_event->session_event();
+ 
   RC rc = RC::SUCCESS;
   // select mutiple tables happens here
   if (select_stmt->tables().size() > 1) {
