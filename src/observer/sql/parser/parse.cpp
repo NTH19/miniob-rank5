@@ -92,6 +92,7 @@ void value_destroy(Value *value)
 void condition_init_with_query(Condition *condition, CompOp comp, RelAttr *left_attr,Selects *p){
   condition->has_sel=1;
   condition->comp=comp;
+  condition->value_num=0;
   if(left_attr==NULL){
     condition->left_is_attr=0;
     condition->left_value=*(new Value());
