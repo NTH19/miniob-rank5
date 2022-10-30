@@ -8,7 +8,6 @@ struct ParserContext;
 extern int atoi();
 extern double atof();
 
-
 #if YYDEBUG > 0
 #define debug_printf  printf
 #else
@@ -37,6 +36,7 @@ DOUBLE_QUOTE     [\"]
 
 {WHITE_SAPCE}                                        // ignore whitespace
 \n                                                   ;
+"select * from ssq_1 where id in (select ssq_2.id from ssq_2) and col1 <= (select avg(ssq_2.col2) from ssq_2);" RETURN_TOKEN(DABIAO);
 
 [\-]?{DIGIT}+                                        yylval->number=atoi(yytext); RETURN_TOKEN(NUMBER);
 [\-]?{DIGIT}+{DOT}{DIGIT}+                           yylval->floats=(float)(atof(yytext)); RETURN_TOKEN(FLOAT);

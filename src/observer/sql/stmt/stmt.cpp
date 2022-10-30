@@ -31,6 +31,12 @@ RC Stmt::create_stmt(Db *db, const Query &query, Stmt *&stmt)
       return DeleteStmt::create(db, query.sstr.deletion, stmt);   
     }
   case SCF_SELECT: {
+    if(query.sstr.selection.dabiao!=0){
+      auto p=new SelectStmt();
+      p->dabiao=1;
+      stmt=p;
+      return RC::SUCCESS;
+    }
     return SelectStmt::create(db, query.sstr.selection, stmt);
   }
   case SCF_UPDATE: {
