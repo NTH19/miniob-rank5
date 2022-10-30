@@ -88,10 +88,10 @@ public:
 public:
   static RC create(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
 			const Condition *conditions, int condition_num,
-			FilterStmt *&stmt);
+			FilterStmt *&stmt,bool out=false);
 
   static RC create_filter_unit(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
-			       const Condition &condition, FilterUnit *&filter_unit);
+			       const Condition &condition, FilterUnit *&filter_unit,bool out= false);
 
 private:
   std::vector<FilterUnit *>  filter_units_; // 默认当前都是AND关系

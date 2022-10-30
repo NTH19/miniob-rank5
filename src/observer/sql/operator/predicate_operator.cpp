@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/filter_stmt.h"
 #include "storage/common/field.h"
 
+
 RC PredicateOperator::open()
 {
   if (children_.size() != 1) {
@@ -74,8 +75,27 @@ bool PredicateOperator::do_predicate(RowTuple &tuple)
     CompOp comp = filter_unit->comp();
     TupleCell left_cell;
     TupleCell right_cell;
-
+    if(right_expr->type()==ExprType::EXIST){
+      auto pp=dynamic_cast<ExitsnotExits*>(right_expr);
+      if(pp->do_compare(&tuple))continue;
+      else return false;
+    }else if(right_expr->type()==ExprType::NOT_EXIST){
+      auto pp=dynamic_cast<ExitsnotExits*>(right_expr);
+      if(pp->do_compare(&tuple))continue;
+      else return false;
+    }
     if(left_expr->get_value(tuple, left_cell)==RC::NOTFOUND)continue;
+    if(right_expr->type()==ExprType::IN_EXPR){
+      auto pp=dynamic_cast<Inexpr*>(right_expr);
+      if(pp->do_compare(left_cell))continue;
+      else return false;
+    }
+    else if(right_expr->type()==ExprType::NOT_INEXPR){
+      auto pp=dynamic_cast<NotInexpr*>(right_expr);
+      if(pp->do_compare(left_cell))continue;
+      else return false;
+    }
+    
     if(right_expr->get_value(tuple, right_cell)==RC::NOTFOUND)continue;
 
     bool filter_result = false;

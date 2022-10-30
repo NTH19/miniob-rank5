@@ -585,7 +585,7 @@ void p_mutiple_table_header(std::ostream &os, std::vector<ProjectOperator> &p, b
 
   os << "\n";
 }
-bool gen_compare_res(TupleCell &left_cell, TupleCell &right_cell, CompOp &cmp)
+bool gen_compare_res(TupleCell &left_cell, TupleCell &right_cell, CompOp cmp)
 {
   bool canAdd = false;
 
