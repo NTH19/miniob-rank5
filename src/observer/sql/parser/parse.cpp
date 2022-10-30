@@ -22,6 +22,11 @@ RC parse(char *st, Query *sqln);
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
+void selects_append_order(Selects *selects, RelAttr *rel_attr, int order) {
+  selects->order_by[selects->order_num].attribute = *rel_attr;
+  selects->order_by[selects->order_num].order = order;
+  selects->order_num++;
+}
 void relation_attr_init(RelAttr *relation_attr, const char *relation_name, const char *attribute_name)
 {
   
@@ -225,7 +230,11 @@ void selects_destroy(Selects *selects)
     selects->alias_name[i]=NULL;
     selects->real_name[i]-NULL;
   }
-  selects->aggfun_num = 0;
+  selects->alias_num = 0;
+  for (size_t i = 0; i < selects->order_num; i++) {
+    relation_attr_destroy(&selects->attributes[i]);
+  }
+  selects->order_num = 0;
 }
 
 void inserts_init(Inserts *inserts, const char *relation_name, Value values[], size_t value_num,size_t single_record_length[], size_t record_num)

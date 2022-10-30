@@ -18,7 +18,16 @@ See the Mulan PSL v2 for more details. */
 #include "common/seda/stage.h"
 #include "sql/parser/parse.h"
 #include "rc.h"
-
+#include "../expr/tuple.h"
+class TupleSortUtil {
+public:
+bool operator ()( Tuple* lhs,  Tuple* rhs);
+void set(const Table *table, Field order_field,int order);
+private:
+  const Table *table_;
+  Field order_field_;
+  int order_;
+};
 class SQLStageEvent;
 class SessionEvent;
 class SelectStmt;

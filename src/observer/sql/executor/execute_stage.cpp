@@ -813,6 +813,28 @@ RC gen_ret_of_aggfun(
   }
   return rc;
 }
+ bool TupleSortUtil::operator()( Tuple* lhs,  Tuple* rhs) {
+    int ret = 0;
+      TupleCell leftcell;TupleCell rightcell;
+      lhs->find_cell(order_field_,leftcell);
+      rhs->find_cell(order_field_,rightcell);
+      ret = leftcell.compare(rightcell);
+      if (ret != 0) {
+        if (order_== 0) {
+          // ASC
+          return ret < 0;
+        } else {
+          // DESC
+          return ret > 0;
+        }
+      }
+    return ret < 0;
+  }
+  void TupleSortUtil::set(const Table *table, Field order_field,int order) {
+    table_ = table;
+    order_field_=order_field;
+    order_=order;
+  }
 RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 {
   SelectStmt *select_stmt = (SelectStmt *)(sql_event->stmt());
@@ -924,7 +946,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   }
 
   DEFER([&]() { delete scan_oper; });
-
+// single table
   PredicateOperator pred_oper(select_stmt->filter_stmt());
   pred_oper.add_child(scan_oper);
   ProjectOperator project_oper;
@@ -939,8 +961,11 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   }
 
   Table *thistable = select_stmt->tables()[0];
+  std::vector<std::pair<Field,int>> orders;
+  orders.swap(select_stmt->order_fields);//  
   std::stringstream ss;
   print_tuple_header(ss, project_oper);
+  std::vector<Tuple *> temp_tupleset; 
   while ((rc = project_oper.next()) == RC::SUCCESS) {
     // get current record
     // write to response
@@ -950,11 +975,29 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
       LOG_WARN("failed to get current record. rc=%s", strrc(rc));
       break;
     }
+    // Tuple * mytuple;
+    // mytuple= new Tuple(dynamic_cast<ProjectTuple*>(tuple)->tuple());
+    // auto p=new ProjectTuple(*dynamic_cast<ProjectTuple*>(tuple));
+    
+    // temp_tupleset.push_back(p);
 
     tuple_to_string(ss, *tuple);
     ss << std::endl;
+    
   }
+  // use orders to change position
 
+// TupleSortUtil util;
+// for (int i = 0; i < orders.size(); i++)
+// {
+//   util.set(thistable,orders[i].first,orders[i].second);
+//   std::sort(temp_tupleset.begin(), temp_tupleset.end(), util);
+// }
+
+// for(int i =0;i<temp_tupleset.size();i++){
+//     tuple_to_string(ss, *temp_tupleset[i]);
+//     ss << std::endl;
+// }
   if (rc != RC::RECORD_EOF) {
     LOG_WARN("something wrong while iterate operator. rc=%s", strrc(rc));
     project_oper.close();

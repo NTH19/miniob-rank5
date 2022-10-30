@@ -72,7 +72,7 @@ void ProjectOperator::add_projection(
       spec->set_alias(alias_set[std::string(field_meta->name())].c_str());
     else
       spec->set_alias(field_meta->name());
-  } else {
+  } else {// multi tables
     const char *field_name = nullptr;
     const char *table_name = nullptr;
     if (j > 0)

@@ -67,7 +67,10 @@ typedef struct _Value {
   void *data;     // value
   int _is_null;
 } Value;
-
+typedef struct _OrderBy {
+  RelAttr attribute;  // order by this attribute
+  int     order;      // 0:asc, 1:desc
+} OrderBy;
 typedef struct _Condition {
   int left_is_attr;    // TRUE if left-hand side is an attribute
                        // 1时，操作符左边是属性名，0时，是属性值
@@ -100,6 +103,8 @@ typedef struct {
   char * real_name[MAX_NUM];
   char * alias_name[MAX_NUM];
   size_t alias_num;
+   size_t    order_num;
+  OrderBy   order_by[MAX_NUM];
 } Selects;
 
 // struct of insert
@@ -252,7 +257,7 @@ void Init_AggFun_Rel(AggFun *a, DescribeFun des, const char* rel_name, const cha
 
 void selects_init(Selects *selects, ...);
 void selects_append_aggfun(Selects *selects, AggFun * a);
-
+void selects_append_order(Selects *selects, RelAttr *rel_attr, int order);
 void selects_append_alias(Selects *selects, const char *name,const char *alias_name);
 void selects_append_alias2(Selects *selects, const char *name,const char *rname,const char *alias_name);
 void selects_append_alias3(Selects *selects, AggFun * a,const char* alias);

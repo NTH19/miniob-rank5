@@ -24,6 +24,7 @@ typedef struct ParserContext {
   DescribeFun des[MAX_NUM];
   CompOp comp;
 	char id[MAX_NUM];
+	int order; 
 } ParserContext;
 
 //获取子串
@@ -73,6 +74,7 @@ ParserContext *get_context(yyscan_t scanner)
         INDEX
         SELECT
         DESC
+		ASC
         SHOW
         SYNC
         INSERT
@@ -122,6 +124,8 @@ ParserContext *get_context(yyscan_t scanner)
 		NULLL
 		NULLABLE
 		UNIQUE
+		ORDER
+        BY
 
 %union {
   struct _Attr *attr;
@@ -557,7 +561,7 @@ update_agg:
 	;
 
 select:				/*  select 语句的语法解析树*/
-    SELECT select_attr FROM ID rel_list where SEMICOLON{
+    SELECT select_attr FROM ID rel_list where order_by SEMICOLON{
 			// CONTEXT->ssql->sstr.selection.relations[CONTEXT->from_length++]=$4;
 			selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
 
@@ -613,6 +617,40 @@ select:				/*  select 语句的语法解析树*/
 		CONTEXT->select_length=0;
 		CONTEXT->value_length = 0;
 	}
+	;
+order_by:
+
+	| ORDER BY order_item order_item_list
+	;
+
+order_item: 
+	ID order {
+		RelAttr attr;
+		relation_attr_init(&attr, NULL, $1);
+		selects_append_order(&CONTEXT->ssql->sstr.selection, &attr, CONTEXT->order);
+	}
+	| ID DOT ID order {
+		RelAttr attr;
+		relation_attr_init(&attr, $1, $3);
+		selects_append_order(&CONTEXT->ssql->sstr.selection, &attr, CONTEXT->order);
+	}
+	;
+
+order:
+	/* empty */ {
+		CONTEXT->order = 0;
+	}
+	| ASC {
+		CONTEXT->order = 0;
+	}
+	| DESC {
+		CONTEXT->order = 1;
+	}
+	;
+
+order_item_list:
+	/* empty */
+	| COMMA order_item order_item_list
 	;
 join_list:
 	 /* empty */
