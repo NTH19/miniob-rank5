@@ -18,7 +18,6 @@ typedef struct ParserContext {
   size_t sub_cons_num;
   size_t record_length;
   size_t single_record_length[MAX_DATA];
-  size_t sub_querynum;
   size_t value_length;
   CompOp tempOp;
   size_t sub_use_comp;
@@ -27,7 +26,7 @@ typedef struct ParserContext {
   Condition sub_cons[MAX_NUM];
   DescribeFun des[MAX_NUM];
   CompOp comp;
-	char id[MAX_NUM];
+  char id[MAX_NUM];
 } ParserContext;
 
 //获取子串
@@ -52,7 +51,6 @@ void yyerror(yyscan_t scanner, const char *str)
   context->from_length = 0;
   context->select_length = 0;
   context->value_length = 0;
-  context->sub_querynum=0;
   context->tempOp=COMP_IS_NOT;
   context->ssql->sstr.selection.sub_query_num=0;
   context->ssql->sstr.insertion.value_num = 0;

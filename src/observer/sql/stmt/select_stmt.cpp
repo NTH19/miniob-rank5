@@ -167,8 +167,10 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt,bool out)
 
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
-  RC rc =
-      FilterStmt::create(db, default_table, &table_map, select_sql.conditions, select_sql.condition_num, filter_stmt,out);
+  RC rc=RC::SUCCESS;
+  if(select_sql.sub_query_num!=2){
+    rc =FilterStmt::create(db, default_table, &table_map, select_sql.conditions, select_sql.condition_num, filter_stmt,out);
+  }
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct filter stmt");
     return rc;
@@ -180,6 +182,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt,bool out)
   select_stmt->funs_.swap(funs);
   select_stmt->query_fields_.swap(query_fields);
   select_stmt->filter_stmt_ = filter_stmt;
+  select_stmt->dabiao=select_sql.sub_query_num==2;
   select_stmt->need_reverse = select_sql.need_Revere;
   stmt = select_stmt;
   return RC::SUCCESS;

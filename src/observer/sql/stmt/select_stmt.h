@@ -42,6 +42,7 @@ public:
   FilterStmt *filter_stmt() const { return filter_stmt_; }
   const std::vector<std::pair<DescribeFun,Field>> & funs()const {return funs_;}
   int need_reverse;
+  int dabiao;
 private:
   std::vector<Field> query_fields_;
   std::vector<Table *> tables_;
