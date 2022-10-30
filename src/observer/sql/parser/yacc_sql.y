@@ -566,21 +566,9 @@ update_agg:
 	;
 
 select:
-	DABIAO{
-		selects_append_relation(&CONTEXT->ssql->sstr.selection, "f");
-
-			selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
-
-			CONTEXT->ssql->flag=SCF_SELECT;
-			CONTEXT->ssql->sstr.selection.dabiao=1;
-			//临时变量清零
-			CONTEXT->condition_length=0;
-			CONTEXT->from_length=0;
-			CONTEXT->select_length=0;
-			CONTEXT->value_length = 0;
-	}
+	
 	/*  select 语句的语法解析树*/
-    | SELECT select_attr FROM ID rel_list where SEMICOLON{
+    SELECT select_attr FROM ID rel_list where SEMICOLON{
 			selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
 
 			selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);

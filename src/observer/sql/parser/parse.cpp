@@ -127,16 +127,16 @@ void condition_init(Condition *condition, CompOp comp, int left_is_attr, RelAttr
 }
 void condition_destroy(Condition *condition)
 {
-  if (condition->left_is_attr) {
-    relation_attr_destroy(&condition->left_attr);
-  } else {
-    value_destroy(&condition->left_value);
-  }
-  if (condition->right_is_attr) {
-    relation_attr_destroy(&condition->right_attr);
-  } else {
-    value_destroy(&condition->right_value);
-  }
+  // if (condition->left_is_attr) {
+  //   relation_attr_destroy(&condition->left_attr);
+  // } else {
+  //   value_destroy(&condition->left_value);
+  // }
+  // if (condition->right_is_attr) {
+  //   relation_attr_destroy(&condition->right_attr);
+  // } else {
+  //   value_destroy(&condition->right_value);
+  // }
 }
 
 void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, size_t length, int nullable)

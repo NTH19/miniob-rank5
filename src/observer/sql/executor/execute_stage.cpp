@@ -812,10 +812,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 {
   SelectStmt *select_stmt = (SelectStmt *)(sql_event->stmt());
   SessionEvent *session_event = sql_event->session_event();
-  if(select_stmt->dabiao){
-    session_event->set_response("ID | COL1 | FEAT1\n1 | 4 | 11.2\n");
-    return RC::SUCCESS;
-  }
+ 
   RC rc = RC::SUCCESS;
   // select mutiple tables happens here
   if (select_stmt->tables().size() > 1) {
