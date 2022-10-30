@@ -588,7 +588,7 @@ void p_mutiple_table_header(std::ostream &os, std::vector<ProjectOperator> &p, b
 
   os << "\n";
 }
-bool gen_compare_res(TupleCell &left_cell, TupleCell &right_cell, CompOp &cmp)
+bool gen_compare_res(TupleCell &left_cell, TupleCell &right_cell, CompOp cmp)
 {
   bool canAdd = false;
 
@@ -781,7 +781,7 @@ RC gen_ret_of_aggfun(
   ProjectOperator project_oper;
   project_oper.add_child(&pred_oper);
   for (int i = 0; i < funs.size(); ++i) {
-    project_oper.add_projection(funs[i].second.table(), funs[i].second.meta(),alias_map);
+    project_oper.add_projection(funs[i].second.table(), funs[i].second.meta(),false,alias_map);
   }
   rc = project_oper.open();
   if (rc != RC::SUCCESS) {
@@ -839,9 +839,11 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 {
   SelectStmt *select_stmt = (SelectStmt *)(sql_event->stmt());
   SessionEvent *session_event = sql_event->session_event();
+
   // alias map
   std::map<std::string,std::string> alias_set;
   alias_set.swap(select_stmt->aliasset_);
+
   RC rc = RC::SUCCESS;
   // select mutiple tables happens here
   if (select_stmt->tables().size() > 1) {
@@ -889,7 +891,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
         j++;
       }
       accuse = j;
-      project_oper[j].add_projection(query_fields[i].table(), query_fields[i].meta(), alias_set,true);// must void only value copy,must reference copy!!!
+      project_oper[j].add_projection(query_fields[i].table(), query_fields[i].meta(),true, alias_set);// must void only value copy,must reference copy!!!
       m[std::string(query_fields[i].table()->name())] = &project_oper[j];
     }
     project_oper.resize(accuse + 1);
@@ -952,7 +954,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   ProjectOperator project_oper;
   project_oper.add_child(&pred_oper);
   for (const Field &field : select_stmt->query_fields()) {
-    project_oper.add_projection(field.table(), field.meta(),alias_set);
+    project_oper.add_projection(field.table(), field.meta(),false,alias_set);
   }
   rc = project_oper.open();
   if (rc != RC::SUCCESS) {
@@ -1276,7 +1278,7 @@ RC do_update_select(SelectStmt *select_stmt, SessionEvent *session_event, std::v
   ProjectOperator project_oper;
   project_oper.add_child(&pred_oper);
   for (const Field &field : select_stmt->query_fields()) {
-    project_oper.add_projection(field.table(), field.meta(),alias_set);
+    project_oper.add_projection(field.table(), field.meta(),false,alias_set);
   }
   rc = project_oper.open();
   if (rc != RC::SUCCESS) {

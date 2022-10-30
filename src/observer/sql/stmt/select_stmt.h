@@ -35,7 +35,7 @@ public:
 
   StmtType type() const override { return StmtType::SELECT; }
 public:
-  static RC create(Db *db, const Selects &select_sql, Stmt *&stmt);
+  static RC create(Db *db, const Selects &select_sql, Stmt *&stmt,bool outatble=false);
 
 public:
   const std::vector<Table *> &tables() const { return tables_; }
@@ -43,8 +43,10 @@ public:
   FilterStmt *filter_stmt() const { return filter_stmt_; }
   const std::vector<std::pair<DescribeFun,Field>> & funs()const {return funs_;}
   int need_reverse;
+
   std::map<std::string,std::string> aliasset_;
   std::vector<std::pair<Field,int>>   order_fields;
+
 private:
   std::vector<Field> query_fields_;
   std::vector<Table *> tables_;

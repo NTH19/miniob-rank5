@@ -22,6 +22,13 @@ class TupleCell
 {
 public: 
   TupleCell() = default;
+  static void deepcopyTupleCell(TupleCell& src,TupleCell& des){
+    des.attr_type_=src.attr_type_;
+    des.length_=src.length_;
+    auto p=new int;
+    memcpy(p,src.data_,4);
+    des.data_=(char*)p;
+  }
   
   TupleCell(FieldMeta *meta, char *data)
     : TupleCell(meta->type(), data)

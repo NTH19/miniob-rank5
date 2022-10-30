@@ -13,17 +13,20 @@ See the Mulan PSL v2 for more details. */
 //
 
 #pragma once
-
+//#include "tuple.h"
 #include <string.h>
 #include "storage/common/field.h"
 #include "sql/expr/tuple_cell.h"
-
 class Tuple;
 
 enum class ExprType {
   NONE,
   FIELD,
   VALUE,
+  IN_EXPR,
+  NOT_INEXPR,
+  EXIST,
+  NOT_EXIST
 };
 
 class Expression
@@ -35,7 +38,18 @@ public:
   virtual RC get_value(const Tuple &tuple, TupleCell &cell) const = 0;
   virtual ExprType type() const = 0;
 };
+class Inexpr:public Expression{
+public:
 
+  virtual ~Inexpr() = default;
+  ExprType type() const override
+  {
+    return ExprType::IN_EXPR;
+  }
+  bool do_compare(TupleCell left);
+  RC get_value(const Tuple &tuple, TupleCell &cell) const override{return RC::SUCCESS;};
+  std::vector<TupleCell> tuplecells;
+};
 class FieldExpr : public Expression
 {
 public:
@@ -100,4 +114,31 @@ public:
 
 private:
   TupleCell tuple_cell_;
+};
+
+class NotInexpr:public Expression{
+public:
+
+  virtual ~NotInexpr() = default;
+  ExprType type() const override
+  {
+    return ExprType::NOT_INEXPR;
+  }
+  bool do_compare(TupleCell left);
+  RC get_value(const Tuple &tuple, TupleCell &cell) const override{return RC::SUCCESS;};
+  std::vector<TupleCell> tuplecells;
+};
+class SelectStmt;
+class ExitsnotExits:public Expression{
+public:
+
+  virtual ~ExitsnotExits() = default;
+  ExprType type() const override
+  {
+    return ee;
+  }
+  bool do_compare(Tuple *left);
+  RC get_value(const Tuple &tuple, TupleCell &cell) const override{return RC::SUCCESS;};
+  SelectStmt* ptr;
+  ExprType ee;
 };

@@ -998,7 +998,25 @@ RC Table::update_record(Trx *trx, Record *record, const char *new_data) {
 
   if (trx != nullptr) {
     rc = trx->update_record(this, record);
-    // TODO: CLog
+    if (rc != RC::SUCCESS) {
+      LOG_PANIC("failed to insert record into trx: %s", strrc(rc));
+      return rc;
+    }
+
+    Record new_record;
+    new_record.set_data(const_cast<char *>(new_data));
+    new_record.set_rid(record->rid_);
+    // append clog record
+    CLogRecord *clog_record = nullptr;
+    rc = clog_manager_->clog_gen_record(CLogType::REDO_INSERT, trx->get_current_id(), clog_record, name(), table_meta_.record_size(), &new_record);
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to create a clog record. rc=%d:%s", rc, strrc(rc));
+      return rc;
+    }
+    rc = clog_manager_->clog_append_record(clog_record);
+    if (rc != RC::SUCCESS) {
+      return rc;
+    }
   }
 
   return rc;

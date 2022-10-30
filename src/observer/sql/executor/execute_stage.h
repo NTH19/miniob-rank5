@@ -17,6 +17,37 @@ See the Mulan PSL v2 for more details. */
 
 #include "common/seda/stage.h"
 #include "sql/parser/parse.h"
+#include "common/io/io.h"
+#include "common/log/log.h"
+#include "common/lang/defer.h"
+#include "common/seda/timer_stage.h"
+#include "common/lang/string.h"
+#include "session/session.h"
+#include "event/storage_event.h"
+#include "event/sql_event.h"
+#include "event/session_event.h"
+#include "sql/expr/tuple.h"
+#include "sql/operator/table_scan_operator.h"
+#include "sql/operator/index_scan_operator.h"
+#include "sql/operator/predicate_operator.h"
+#include "sql/operator/delete_operator.h"
+#include "sql/operator/project_operator.h"
+#include "sql/operator/update_operator.h"
+#include "sql/stmt/stmt.h"
+#include "sql/stmt/select_stmt.h"
+#include "sql/stmt/update_stmt.h"
+#include "sql/stmt/delete_stmt.h"
+#include "sql/stmt/insert_stmt.h"
+#include "sql/stmt/filter_stmt.h"
+#include "storage/common/table.h"
+#include "storage/common/field.h"
+#include "storage/index/index.h"
+#include "storage/default/default_handler.h"
+#include "storage/common/condition_filter.h"
+#include "storage/trx/trx.h"
+#include <algorithm>
+#include "storage/clog/clog.h"
+#include "util/util.h"
 #include "rc.h"
 #include "../expr/tuple.h"
 class TupleSortUtil {
@@ -67,5 +98,9 @@ private:
   Stage *default_storage_stage_ = nullptr;
   Stage *mem_storage_stage_ = nullptr;
 };
-
+RC gen_ret_of_aggfun(
+    SelectStmt *select_stmt, std::vector<std::pair<int, int>> &ret, std::vector<int> &char_len, std::stringstream &ss);
+void agg_result(std::vector<std::pair<int, int>> &ret, const std::vector<std::pair<DescribeFun, Field>> &funs,
+    std::vector<int> &char_len, std::vector<Value> &out_value);
+bool gen_compare_res(TupleCell &left_cell, TupleCell &right_cell, CompOp cmp);
 #endif  //__OBSERVER_SQL_EXECUTE_STAGE_H__

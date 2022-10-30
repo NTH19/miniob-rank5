@@ -25,8 +25,7 @@ class Db;
 class Table;
 class FieldMeta;
 
-class FilterUnit
-{
+class FilterUnit {
 public:
   FilterUnit() = default;
   ~FilterUnit()
@@ -40,12 +39,14 @@ public:
       right_ = nullptr;
     }
   }
-  
-  void set_comp(CompOp comp) {
+
+  void set_comp(CompOp comp)
+  {
     comp_ = comp;
   }
 
-  CompOp comp() const {
+  CompOp comp() const
+  {
     return comp_;
   }
 
@@ -72,10 +73,8 @@ private:
   Expression *right_ = nullptr;
 };
 
-class FilterStmt 
-{
+class FilterStmt {
 public:
-
   FilterStmt() = default;
   virtual ~FilterStmt();
 
@@ -87,14 +86,13 @@ public:
 
 public:
   static RC create(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
-			const Condition *conditions, int condition_num,
-			FilterStmt *&stmt,std::map<std::string,std::string> alias_name_map=std::map<std::string,std::string>());
+      const Condition *conditions, int condition_num, FilterStmt *&stmt,std::map<std::string, std::string> alias_name_map = std::map<std::string, std::string>(), bool out = false);
 
   static RC create_filter_unit(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
-			       const Condition &condition, FilterUnit *&filter_unit,std::map<std::string,std::string> alias_name_map=std::map<std::string,std::string>());
+      const Condition &condition, FilterUnit *&filter_unit,std::map<std::string, std::string> alias_name_map = std::map<std::string, std::string>(), bool out = false);
 
-  std::map<std::string,std::string> alias_name_map;
+  std::map<std::string, std::string> alias_name_map;
 
 private:
-  std::vector<FilterUnit *>  filter_units_; // 默认当前都是AND关系
+  std::vector<FilterUnit *> filter_units_;  // 默认当前都是AND关系
 };
