@@ -47,8 +47,8 @@ public:
   {
     return ExprType::IN_EXPR;
   }
-  bool do_compare(TupleCell left);
-  bool do_expr(TupleCell left);
+  int do_compare(TupleCell left);
+  int do_expr(TupleCell left);
   RC get_value(const Tuple &tuple, TupleCell &cell) const override{return RC::SUCCESS;};
   std::vector<TupleCell> tuplecells;
   SelectStmt* ptr=nullptr;
@@ -127,8 +127,8 @@ public:
   {
     return ExprType::NOT_INEXPR;
   }
-  bool do_expr(TupleCell left);
-  bool do_compare(TupleCell left);
+  int do_expr(TupleCell left);
+  int do_compare(TupleCell left);
   RC get_value(const Tuple &tuple, TupleCell &cell) const override{return RC::SUCCESS;};
   std::vector<TupleCell> tuplecells;
   SelectStmt* ptr=nullptr;
@@ -156,7 +156,7 @@ public:
   {
     return ExprType::NORMAL;
   }
-  bool do_compare(TupleCell left);
+  int do_compare(TupleCell left);
   RC get_value(const Tuple &tuple, TupleCell &cell) const override{return RC::SUCCESS;};
   SelectStmt* ptr=nullptr;
   CompOp cmp;

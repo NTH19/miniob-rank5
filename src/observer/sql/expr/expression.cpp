@@ -169,7 +169,7 @@ RC ValueExpr::get_value(const Tuple &tuple, TupleCell &cell) const
   cell = tuple_cell_;
   return RC::SUCCESS;
 }
-bool Inexpr::do_compare(TupleCell left)
+int Inexpr::do_compare(TupleCell left)
 {
   if (ptr != nullptr)
     return do_expr(left);
@@ -180,10 +180,10 @@ bool Inexpr::do_compare(TupleCell left)
   }
   return false;
 }
-bool Inexpr::do_expr(TupleCell left)
+int Inexpr::do_expr(TupleCell left)
 {
   std::vector<TupleCell> tupe;
-  get_valuse_from_signle_field_select(tupe, ptr);
+  if(get_valuse_from_signle_field_select(tupe, ptr)==RC::ABORT)return 2;
   for (int i = 0; i < tupe.size(); ++i) {
     if (gen_compare_res(left, tupe[i], EQUAL_TO)) {
       return true;
@@ -191,10 +191,10 @@ bool Inexpr::do_expr(TupleCell left)
   }
   return false;
 }
-bool NotInexpr::do_expr(TupleCell left)
+int NotInexpr::do_expr(TupleCell left)
 {
   std::vector<TupleCell> tupe;
-  get_valuse_from_signle_field_select(tupe, ptr);
+  if(get_valuse_from_signle_field_select(tupe, ptr)==RC::ABORT)return 2;
   for (int i = 0; i < tupe.size(); ++i) {
     if (!gen_compare_res(left, tupe[i], NOT_EQUAL)) {
       return false;
@@ -202,7 +202,7 @@ bool NotInexpr::do_expr(TupleCell left)
   }
   return true;
 }
-bool NotInexpr::do_compare(TupleCell left)
+int NotInexpr::do_compare(TupleCell left)
 {
   if (ptr != nullptr)
     return do_expr(left);
@@ -213,10 +213,10 @@ bool NotInexpr::do_compare(TupleCell left)
   }
   return true;
 }
-bool NormalCopExpr::do_compare(TupleCell left){
+int NormalCopExpr::do_compare(TupleCell left){
   std::vector<TupleCell> tupe;
-  get_valuse_from_signle_field_select(tupe, ptr);
-  if (tupe.size() != 1)return false;
+  if(get_valuse_from_signle_field_select(tupe, ptr)==RC::ABORT)return 2;
+  if (tupe.size() != 1)return 2;
   return gen_compare_res(left,tupe[0],cmp);
 }
 bool ExitsnotExits::do_compare(Tuple *left)

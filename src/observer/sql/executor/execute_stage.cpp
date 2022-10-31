@@ -951,8 +951,13 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   }
 
   if (rc != RC::RECORD_EOF) {
-    LOG_WARN("something wrong while iterate operator. rc=%s", strrc(rc));
+    //LOG_WARN("something wrong while iterate operator. rc=%s", strrc(rc));
     project_oper.close();
+    if(rc==RC::ABORT){
+      session_event->set_response("FAILURE\n");
+      return RC::SUCCESS;
+    }
+    
   } else {
     rc = project_oper.close();
   }

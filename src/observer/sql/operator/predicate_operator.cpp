@@ -43,9 +43,13 @@ RC PredicateOperator::next()
       break;
     }
     TableTupleMap[std::string(static_cast<RowTuple &>(*tuple).GetTable()->name())]=tuple;
-    if (do_predicate(static_cast<RowTuple &>(*tuple))) {
+    int pred=do_predicate(static_cast<RowTuple &>(*tuple));
+    if (pred && pred!=0xff) {
       TableTupleMap.erase(std::string(static_cast<RowTuple &>(*tuple).GetTable()->name()));
       return rc;
+    }else if(pred==0xff){
+      TableTupleMap.erase(std::string(static_cast<RowTuple &>(*tuple).GetTable()->name()));
+      return RC::ABORT;
     }
     TableTupleMap.erase(std::string(static_cast<RowTuple &>(*tuple).GetTable()->name()));
   }
@@ -145,7 +149,7 @@ inline bool gen_compare_res(TupleCell &left_cell, TupleCell &right_cell, CompOp 
   }
   return filter_result;
 }
-bool PredicateOperator::do_predicate(RowTuple &tuple)
+int PredicateOperator::do_predicate(RowTuple &tuple)
 {
   if (filter_stmt_ == nullptr || filter_stmt_->filter_units().empty()) {
     return true;
@@ -195,18 +199,27 @@ bool PredicateOperator::do_predicate(RowTuple &tuple)
     if(left_expr->get_value(tuple, left_cell)==RC::NOTFOUND)continue;
     if(right_expr->type()==ExprType::IN_EXPR){
       auto pp=dynamic_cast<Inexpr*>(right_expr);
-      if(pp->do_compare(left_cell))continue;
-      else return false;
+      int res=pp->do_compare(left_cell);
+      if(res==1)continue;
+      else if(res==2){
+        return 0xff;
+      }else return false;
     }
     else if(right_expr->type()==ExprType::NOT_INEXPR){
       auto pp=dynamic_cast<NotInexpr*>(right_expr);
-      if(pp->do_compare(left_cell))continue;
-      else return false;
+      int res=pp->do_compare(left_cell);
+      if(res==1)continue;
+      else if(res==2){
+        return 0xff;
+      }else return false;
     }
     else if(right_expr->type()==ExprType::NORMAL){
       auto pp=dynamic_cast<NormalCopExpr*>(right_expr);
-      if(pp->do_compare(left_cell))continue;
-      else return false;
+      int res=pp->do_compare(left_cell);
+      if(res==1)continue;
+      else if(res==2){
+        return 0xff;
+      }else return false;
     }
     
     if(right_expr->get_value(tuple, right_cell)==RC::NOTFOUND)continue;
