@@ -161,6 +161,7 @@ public:
   {
     return *record_;
   }
+  const Table* GetTable()const{return table_;}
 private:
   Record *record_ = nullptr;
   const Table *table_ = nullptr;

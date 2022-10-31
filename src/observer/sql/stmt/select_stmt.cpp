@@ -182,5 +182,6 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt,bool out)
   select_stmt->filter_stmt_ = filter_stmt;
   select_stmt->need_reverse = select_sql.need_Revere;
   stmt = select_stmt;
+  select_stmt->is_da=select_sql.is_da;
   return RC::SUCCESS;
 }
