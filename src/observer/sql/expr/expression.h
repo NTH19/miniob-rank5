@@ -26,9 +26,10 @@ enum class ExprType {
   IN_EXPR,
   NOT_INEXPR,
   EXIST,
+  NORMAL,
   NOT_EXIST
 };
-
+class SelectStmt;
 class Expression
 {
 public: 
@@ -47,8 +48,10 @@ public:
     return ExprType::IN_EXPR;
   }
   bool do_compare(TupleCell left);
+  bool do_expr(TupleCell left);
   RC get_value(const Tuple &tuple, TupleCell &cell) const override{return RC::SUCCESS;};
   std::vector<TupleCell> tuplecells;
+  SelectStmt* ptr=nullptr;
 };
 class FieldExpr : public Expression
 {
@@ -124,11 +127,13 @@ public:
   {
     return ExprType::NOT_INEXPR;
   }
+  bool do_expr(TupleCell left);
   bool do_compare(TupleCell left);
   RC get_value(const Tuple &tuple, TupleCell &cell) const override{return RC::SUCCESS;};
   std::vector<TupleCell> tuplecells;
+  SelectStmt* ptr=nullptr;
 };
-class SelectStmt;
+
 class ExitsnotExits:public Expression{
 public:
 
@@ -141,4 +146,18 @@ public:
   RC get_value(const Tuple &tuple, TupleCell &cell) const override{return RC::SUCCESS;};
   SelectStmt* ptr;
   ExprType ee;
+};
+
+class NormalCopExpr:public Expression{
+public:
+
+  virtual ~NormalCopExpr() = default;
+  ExprType type() const override
+  {
+    return ExprType::NORMAL;
+  }
+  bool do_compare(TupleCell left);
+  RC get_value(const Tuple &tuple, TupleCell &cell) const override{return RC::SUCCESS;};
+  SelectStmt* ptr=nullptr;
+  CompOp cmp;
 };

@@ -43,3 +43,4 @@ private:
 private:
   FilterStmt *filter_stmt_ = nullptr;
 };
+extern std::map<std::string,Tuple*>TableTupleMap;

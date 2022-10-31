@@ -89,41 +89,49 @@ void value_destroy(Value *value)
   value->data = nullptr;
   value->_is_null = 0;
 }
+void condition_init_with_two_query(Condition *condition,CompOp comp,Selects *l,Selects *r){
+  condition->comp=comp;
+  condition->value_num=0;
+  condition->left_type=SEL;
+  condition->right_type=SEL;
+  condition->sel[0]=l;
+  condition->sel[1]=r;
+}
 void condition_init_with_query(Condition *condition, CompOp comp, RelAttr *left_attr,Selects *p){
-  condition->has_sel=1;
   condition->comp=comp;
   condition->value_num=0;
   if(left_attr==NULL){
-    condition->left_is_attr=0;
-    condition->left_value=*(new Value());
-    condition->left_value.data=new int;
-    condition->left_value.type=INTS;
+    condition->left_type=NONE;
   }else{
-  condition->left_is_attr=1;
+  condition->left_type=ATTR;
   condition->left_attr = *left_attr;
   }
-  condition->right_is_attr=0;
-  condition->sel=p;
+  condition->right_type=SEL;
+  condition->sel[1]=p;
+  condition->sel[0]=nullptr;
 }
 void condition_init(Condition *condition, CompOp comp, int left_is_attr, RelAttr *left_attr, Value *left_value,
     int right_is_attr, RelAttr *right_attr, Value *right_value)
 {
   condition->comp = comp;
   condition->value_num=0;
-  condition->left_is_attr = left_is_attr;
   if (left_is_attr) {
     condition->left_attr = *left_attr;
+    condition->left_type=ATTR;
   } else {
     condition->left_value = *left_value;
+    condition->left_type=VALUE;
   }
 
-  condition->right_is_attr = right_is_attr;
   if (right_is_attr) {
     condition->right_attr = *right_attr;
+    condition->right_type=ATTR;
   } else {
     condition->right_value = *right_value;
+    condition->right_type=VALUE;
   }
-  condition->has_sel=0;
+  condition->sel[0]=nullptr;
+  condition->sel[1]=nullptr;
 }
 void condition_destroy(Condition *condition)
 {
@@ -138,6 +146,7 @@ void condition_destroy(Condition *condition)
   //   value_destroy(&condition->right_value);
   // }
 }
+
 
 void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, size_t length, int nullable)
 {
@@ -160,16 +169,18 @@ void selects_append_attribute(Selects *selects, RelAttr *rel_attr)
 }
 void condition_init_cells_for_in(Condition*c, RelAttr *left_attr,Value values[], size_t value_num,CompOp cmp)
 {
-  c->left_is_attr = 1;
+  c->left_type = ATTR;
   c->left_attr = *left_attr;
   c->value_num=value_num;
-  c->right_is_attr=0;
-  c->has_sel=0;
+  c->right_type=CELLS;
   c->comp=cmp;
   for(int i=0;i<value_num;++i){
     c->values[i]=values[i];
   }
+  c->sel[0]=nullptr;
+  c->sel[1]=nullptr;
 }
+
 void selects_append_relation(Selects *selects, const char *relation_name)
 {
   selects->relations[selects->relation_num++] = strdup(relation_name);
@@ -198,7 +209,14 @@ void selects_append_conditions(Selects *selects, Condition conditions[], size_t 
   }
   selects->condition_num = condition_num;
 }
-
+void selects_append_conditions_start(Selects *selects, Condition conditions[], size_t start,size_t end)
+{
+  assert(end-start <= sizeof(selects->conditions) / sizeof(selects->conditions[0]));
+  for (size_t i = start; i < end; i++) {
+    selects->conditions[i] = conditions[i];
+  }
+  selects->condition_num = end-start;
+}
 void selects_destroy(Selects *selects)
 {
   for (size_t i = 0; i < selects->attr_num; i++) {

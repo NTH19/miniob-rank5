@@ -7,7 +7,6 @@ struct ParserContext;
 #include "yacc_sql.tab.h"
 extern int atoi();
 extern double atof();
-
 #if YYDEBUG > 0
 #define debug_printf  printf
 #else
