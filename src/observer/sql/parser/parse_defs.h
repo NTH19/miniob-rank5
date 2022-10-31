@@ -111,7 +111,7 @@ struct _Selects{
   int sub_query_num;
   int need_Revere;
   int need_reverse_join;
-  int dabiao;
+  int is_da;
 } ;
 typedef struct _Selects Selects;
 

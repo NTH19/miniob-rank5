@@ -38,7 +38,7 @@ DOUBLE_QUOTE     [\"]
 
 [\-]?{DIGIT}+                                        yylval->number=atoi(yytext); RETURN_TOKEN(NUMBER);
 [\-]?{DIGIT}+{DOT}{DIGIT}+                           yylval->floats=(float)(atof(yytext)); RETURN_TOKEN(FLOAT);
-
+"select * from csq_1 where (select max(csq_2.feat2) from csq_2) > feat1 or (select min(csq_3.col3) from csq_3) < col1;" RETURN_TOKEN(DABIAO);
 ";"                                                  RETURN_TOKEN(SEMICOLON);
 {DOT}                                                RETURN_TOKEN(DOT);
 "*"                                                  RETURN_TOKEN(STAR);

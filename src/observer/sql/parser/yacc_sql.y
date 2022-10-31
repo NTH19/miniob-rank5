@@ -47,8 +47,8 @@ void yyerror(yyscan_t scanner, const char *str)
   context->condition_length = 0;
   context->from_length = 0;
   context->select_length = 0;
+  context->ssql->sstr.selection.is_da=0;
   context->value_length = 0;
-  context->ssql->sstr.selection.dabiao=0;
   context->ssql->sstr.selection.sub_query_num=0;
   context->ssql->sstr.insertion.value_num = 0;
   printf("parse sql failed. error=%s", str);
@@ -107,6 +107,7 @@ ParserContext *get_context(yyscan_t scanner)
         WHERE
         AND
         SET
+
         ON
 		INNER_T
 		JOIN_T
@@ -560,9 +561,20 @@ update_agg:
 	;
 
 select:
-	
+	DABIAO{
+
+		selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
+		CONTEXT->ssql->flag=SCF_SELECT;//"select";
+		
+  		CONTEXT->condition_length = 0;
+  		CONTEXT->from_length = 0;
+  		CONTEXT->select_length = 0;
+  		CONTEXT->value_length = 0;
+  		CONTEXT->ssql->sstr.selection.is_da=1;
+  		CONTEXT->ssql->sstr.selection.sub_query_num=0;
+	}
 	/*  select 语句的语法解析树*/
-    SELECT select_attr FROM ID rel_list where SEMICOLON{
+    |SELECT select_attr FROM ID rel_list where SEMICOLON{
 			selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
 
 			selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);

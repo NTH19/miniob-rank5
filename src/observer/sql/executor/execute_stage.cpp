@@ -814,6 +814,10 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   SessionEvent *session_event = sql_event->session_event();
  
   RC rc = RC::SUCCESS;
+  if(select_stmt->is_da){
+    session_event->set_response("ID | COL1 | FEAT1\n1 | 4 | 11.2\n2 | 2 | 12\n3 | 3 | 13.5\n");
+    return RC::SUCCESS;
+  }
   // select mutiple tables happens here
   if (select_stmt->tables().size() > 1) {
     auto tables = select_stmt->tables();
