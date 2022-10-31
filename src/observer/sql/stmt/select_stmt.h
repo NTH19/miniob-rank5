@@ -44,7 +44,7 @@ public:
   const std::vector<std::pair<DescribeFun,Field>> & funs()const {return funs_;}
   int need_reverse;
 
-  std::map<std::string,std::string> aliasset_;
+  std::map<std::string,std::queue<std::string>> aliasset_;
   std::vector<std::pair<Field,int>>   order_fields;
 
 private:

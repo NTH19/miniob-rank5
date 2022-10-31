@@ -35,17 +35,17 @@ FilterStmt::~FilterStmt()
 
 RC FilterStmt::create(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
    const Condition *conditions, int condition_num, FilterStmt *&stmt,
-    std::map<std::string, std::string> alias_name_map,bool out)
+    std::map<std::string, std::queue<std::string>> *alias_name_map,bool out)
 
 {
   RC rc = RC::SUCCESS;
   stmt = nullptr;
 
   FilterStmt *tmp_stmt = new FilterStmt();
-  tmp_stmt->alias_name_map = alias_name_map;
+  tmp_stmt->alias_name_map =alias_name_map;
   for (int i = 0; i < condition_num; i++) {
     FilterUnit *filter_unit = nullptr;
-    rc = create_filter_unit(db, default_table, tables, conditions[i], filter_unit, alias_name_map,out);
+    rc = create_filter_unit(db, default_table, tables, conditions[i], filter_unit,tmp_stmt->alias_name_map,out);
     if (rc != RC::SUCCESS) {
       delete tmp_stmt;
       LOG_WARN("failed to create filter unit. condition index=%d", i);
@@ -59,25 +59,25 @@ RC FilterStmt::create(Db *db, Table *default_table, std::unordered_map<std::stri
 }
 
 RC get_table_and_field(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
-    const RelAttr &attr, Table *&table, const FieldMeta *&field,bool out =false,std::map<std::string, std::string> alias_name_map= std::map<std::string, std::string>())
+    const RelAttr &attr, Table *&table, const FieldMeta *&field,bool out =false,std::map<std::string, std::queue<std::string>> *alias_name_map= nullptr)
 
 {
   char *real_relation;
   char *real_attr;
-  if (alias_name_map.size())
+  if (alias_name_map!=nullptr && alias_name_map->size())
   {
-    if (attr.relation_name == nullptr && alias_name_map.count(std::string(attr.attribute_name)) > 0 && alias_name_map[std::string(attr.attribute_name)].find(".") != std::string::npos) {
-    int idx = alias_name_map[std::string(attr.attribute_name)].find(".");
-    real_relation = strdup(alias_name_map[std::string(attr.attribute_name)].substr(0, idx).c_str());
-    real_attr = strdup(alias_name_map[std::string(attr.attribute_name)].substr(idx + 1).c_str());
+    if (attr.relation_name == nullptr && alias_name_map->count(std::string(attr.attribute_name)) > 0 && (*alias_name_map)[std::string(attr.attribute_name)].front().find(".") != std::string::npos) {
+    int idx = (*alias_name_map)[std::string(attr.attribute_name)].front().find(".");
+    real_relation = strdup((*alias_name_map)[std::string(attr.attribute_name)].front().substr(0, idx).c_str());
+    real_attr = strdup((*alias_name_map)[std::string(attr.attribute_name)].front().substr(idx + 1).c_str());
 
   } else {
-    if (alias_name_map.count(std::string(attr.relation_name)) > 0)
-      real_relation = strdup(alias_name_map[std::string(attr.relation_name)].c_str());
+    if (attr.relation_name && alias_name_map->count(std::string(attr.relation_name)) > 0)
+      real_relation = strdup((*alias_name_map)[std::string(attr.relation_name)].front().c_str());
     else
       real_relation = attr.relation_name;
-    if (alias_name_map.count(std::string(attr.attribute_name)) > 0)
-      real_attr = strdup(alias_name_map[std::string(attr.attribute_name)].c_str());
+    if (alias_name_map->count(std::string(attr.attribute_name)) > 0)
+      real_attr = strdup((*alias_name_map)[std::string(attr.attribute_name)].front().c_str());
     else
       real_attr = attr.attribute_name;
   }
@@ -131,7 +131,7 @@ RC get_valuse_from_signle_field_select(std::vector<TupleCell> &values, SelectStm
     return RC::SUCCESS;
   }
   Operator *scan_oper = new TableScanOperator(select_stmt->tables()[0]);
-  std::map<std::string,std::string> alias_set;
+  std::map<std::string,std::queue<std::string>> alias_set;
   alias_set.swap(select_stmt->aliasset_);
 
   RC rc = RC::SUCCESS;
@@ -264,7 +264,7 @@ RC gen_filter_unit_from_query(FilterUnit *&filter_unit, const Condition &conditi
   return RC::SUCCESS;
 }
 RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
-    const Condition &condition, FilterUnit *&filter_unit, std::map<std::string, std::string> alias_name_map,bool out)
+    const Condition &condition, FilterUnit *&filter_unit, std::map<std::string, std::queue<std::string>> *alias_name_map,bool out)
 
 {
   RC rc = RC::SUCCESS;
@@ -284,7 +284,7 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
       Table *table = nullptr;
       const FieldMeta *field = nullptr;
 
-      rc = get_table_and_field(db, default_table, tables, condition.left_attr, table, field,out);
+      rc = get_table_and_field(db, default_table, tables, condition.left_attr, table, field,out,alias_name_map);
       if (rc != RC::SUCCESS) {
         LOG_WARN("cannot find attr");
         return rc;

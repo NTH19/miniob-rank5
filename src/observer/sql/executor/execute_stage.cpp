@@ -771,7 +771,7 @@ RC gen_ret_of_aggfun(
   RC rc = RC::SUCCESS;
   auto funs = select_stmt->funs();
   auto &tables=select_stmt->tables();
-  std::map<std::string,std::string> alias_map;
+  std::map<std::string,std::queue<std::string>> alias_map;
   alias_map.swap(select_stmt->aliasset_);
   Operator *scan_oper = new TableScanOperator(tables[0]);
   DEFER([&]() { delete scan_oper; });
@@ -841,7 +841,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   SessionEvent *session_event = sql_event->session_event();
 
   // alias map
-  std::map<std::string,std::string> alias_set;
+  std::map<std::string,std::queue<std::string>> alias_set;
   alias_set.swap(select_stmt->aliasset_);
 
   RC rc = RC::SUCCESS;
@@ -1251,7 +1251,7 @@ RC do_update_select(SelectStmt *select_stmt, SessionEvent *session_event, std::v
   RC rc = RC::SUCCESS;
 
   // agg fun happens here
-  std::map<std::string,std::string> alias_set;
+  std::map<std::string,std::queue<std::string>> alias_set;
   alias_set.swap(select_stmt->aliasset_);
   if (select_stmt->funs().size() != 0) {
     auto funs = select_stmt->funs();
