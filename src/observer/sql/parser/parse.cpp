@@ -54,12 +54,14 @@ void value_init_integer(Value *value, int v)
 {
   value->type = INTS;
   value->data = malloc(sizeof(v));
+  value->_is_null = 0;
   memcpy(value->data, &v, sizeof(v));
 }
 void value_init_float(Value *value, float v)
 {
   value->type = FLOATS;
   value->data = malloc(sizeof(v));
+  value->_is_null = 0;
   memcpy(value->data, &v, sizeof(v));
 }
 
@@ -67,6 +69,7 @@ void value_init_string(Value *value, const char *v)
 {
   value->type = CHARS;
   value->data = strdup(v);
+  value->_is_null=0;
 }
 
 int value_init_date(Value* value, const char* v) {
@@ -77,6 +80,7 @@ int value_init_date(Value* value, const char* v) {
     if(!b) return -1;
     int dv = y*10000+m*100+d;
     value->data = malloc(sizeof(dv));//TODO:check malloc failure
+    value->_is_null = 0;
     memcpy(value->data, &dv, sizeof(dv));
     return 0;
 }

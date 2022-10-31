@@ -609,17 +609,40 @@ select:				/*  select 语句的语法解析树*/
 		}
 	| SELECT select_attr FROM ID AS ID rel_list where SEMICOLON{
 		selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
+		selects_append_alias(&CONTEXT->ssql->sstr.selection, $4,$6);
 		selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
 		CONTEXT->ssql->flag=SCF_SELECT;//"select";
 		CONTEXT->condition_length=0;
 			CONTEXT->from_length=0;
 			CONTEXT->select_length=0;
 			CONTEXT->value_length = 0;
-		selects_append_alias(&CONTEXT->ssql->sstr.selection, $4,$6);
+		
 	}
-	| SELECT agg_fun_list_head FROM ID AS ID SEMICOLON {
-		selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
+	| SELECT agg_fun_list_head FROM ID AS ID  where SEMICOLON {
+	selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
 		selects_append_alias(&CONTEXT->ssql->sstr.selection, $4,$6);
+	selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
+		CONTEXT->ssql->flag=SCF_SELECT;
+		CONTEXT->condition_length=0;
+		CONTEXT->from_length=0;
+		CONTEXT->select_length=0;
+		CONTEXT->value_length = 0;
+	}
+	| SELECT select_attr FROM ID  ID rel_list where SEMICOLON{
+		selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
+		selects_append_alias(&CONTEXT->ssql->sstr.selection, $4,$5);
+		selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
+		CONTEXT->ssql->flag=SCF_SELECT;//"select";
+		CONTEXT->condition_length=0;
+			CONTEXT->from_length=0;
+			CONTEXT->select_length=0;
+			CONTEXT->value_length = 0;
+		
+	}
+	| SELECT agg_fun_list_head FROM ID  ID  where SEMICOLON {
+	selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
+		selects_append_alias(&CONTEXT->ssql->sstr.selection, $4,$5);
+	selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
 		CONTEXT->ssql->flag=SCF_SELECT;
 		CONTEXT->condition_length=0;
 		CONTEXT->from_length=0;
@@ -931,7 +954,7 @@ sub_query:
 		CONTEXT->select_length=0;
 		CONTEXT->value_length = 0;
 	  }
-	| SELECT ID DOT ID FROM ID AS ID rel_list sub_where {
+	| SELECT ID DOT ID FROM ID AS ID  rel_list sub_where {
 
 		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]=malloc(sizeof(Selects));
 		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]->relation_num=0;
@@ -1089,6 +1112,164 @@ sub_query:
 		CONTEXT->select_length=0;
 		CONTEXT->value_length = 0;
 	  }
+	  | SELECT ID DOT ID FROM ID  ID  rel_list sub_where {
+
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]=malloc(sizeof(Selects));
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]->relation_num=0;
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]->aggfun_num=0;
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]->attr_num=0;
+
+		selects_append_relation(CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num], $6);
+		RelAttr attr;
+		relation_attr_init(&attr, $2, $4);
+		selects_append_attribute(CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num], &attr);
+
+		selects_append_conditions(CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]
+		, CONTEXT->sub_cons, CONTEXT->sub_cons_num);
+		selects_append_alias(&CONTEXT->ssql->sstr.selection, $6,$7);
+
+		CONTEXT->ssql->sstr.selection.sub_query_num++;
+		CONTEXT->sub_cons_num=0;
+		CONTEXT->from_length=0;
+		CONTEXT->select_length=0;
+		CONTEXT->value_length = 0;
+	}
+	|SELECT ID FROM ID  ID rel_list sub_where {
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]=malloc(sizeof(Selects));
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]->relation_num=0;
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]->aggfun_num=0;
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]->attr_num=0;
+		selects_append_relation(CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num], $4);
+		selects_append_conditions(CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]
+		, CONTEXT->sub_cons, CONTEXT->sub_cons_num);
+		RelAttr attr;
+		selects_append_alias(&CONTEXT->ssql->sstr.selection, $4,$5);
+		relation_attr_init(&attr, NULL, $2);
+		selects_append_attribute(CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num], &attr);
+
+		CONTEXT->ssql->sstr.selection.sub_query_num++;
+		CONTEXT->sub_cons_num=0;
+		CONTEXT->from_length=0;
+		CONTEXT->select_length=0;
+		CONTEXT->value_length = 0;
+	}
+	|SELECT COUNT_T LBRACE STAR RBRACE FROM ID  ID sub_where{
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]=malloc(sizeof(Selects));
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]->relation_num=0;
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]->aggfun_num=0;
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]->attr_num=0;
+		selects_append_relation(CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num], $7);
+		selects_append_conditions(CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]
+		, CONTEXT->sub_cons, CONTEXT->sub_cons_num);
+		AggFun aggre;
+		Init_AggFun(&aggre,COUNT_STAR,"*");
+		selects_append_alias(&CONTEXT->ssql->sstr.selection, $7,$8);
+		selects_append_aggfun(CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num],&aggre);
+
+		CONTEXT->ssql->sstr.selection.sub_query_num++;
+		CONTEXT->sub_cons_num=0;
+		CONTEXT->from_length=0;
+		CONTEXT->select_length=0;
+		CONTEXT->value_length = 0;
+	}
+	|SELECT COUNT_T LBRACE ID DOT ID RBRACE FROM ID  ID sub_where{
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]=malloc(sizeof(Selects));
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]->relation_num=0;
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]->aggfun_num=0;
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]->attr_num=0;
+		selects_append_relation(CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num], $9);
+		selects_append_conditions(CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]
+		, CONTEXT->sub_cons, CONTEXT->sub_cons_num);
+		selects_append_alias(&CONTEXT->ssql->sstr.selection, $9,$10);
+		AggFun aggre;
+		Init_AggFun_Rel(&aggre, COUNT, $4, $6);
+		selects_append_aggfun(CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num],&aggre);
+
+		CONTEXT->ssql->sstr.selection.sub_query_num++;
+		CONTEXT->sub_cons_num=0;
+		CONTEXT->from_length=0;
+		CONTEXT->select_length=0;
+		CONTEXT->value_length = 0;
+	}
+	|SELECT MAX_T LBRACE ID DOT ID RBRACE FROM ID  ID sub_where{
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]=malloc(sizeof(Selects));
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]->relation_num=0;
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]->aggfun_num=0;
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]->attr_num=0;
+		selects_append_relation(CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num], $9);
+		selects_append_conditions(CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]
+		, CONTEXT->sub_cons, CONTEXT->sub_cons_num);
+		AggFun aggre;
+		Init_AggFun_Rel(&aggre, MAX, $4, $6);
+		selects_append_alias(&CONTEXT->ssql->sstr.selection, $9,$10);
+		selects_append_aggfun(CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num],&aggre);
+
+		CONTEXT->ssql->sstr.selection.sub_query_num++;
+		CONTEXT->sub_cons_num=0;
+		CONTEXT->from_length=0;
+		CONTEXT->select_length=0;
+		CONTEXT->value_length = 0;
+	}
+	|SELECT MIN_T LBRACE ID DOT ID RBRACE FROM ID ID sub_where{
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]=malloc(sizeof(Selects));
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]->relation_num=0;
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]->aggfun_num=0;
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]->attr_num=0;
+		selects_append_relation(CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num], $9);
+		selects_append_conditions(CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]
+		, CONTEXT->sub_cons, CONTEXT->sub_cons_num);
+		AggFun aggre;
+		Init_AggFun_Rel(&aggre, MIN, $4, $6);
+		selects_append_alias(&CONTEXT->ssql->sstr.selection, $9,$10);
+		selects_append_aggfun(CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num],&aggre);
+
+		CONTEXT->ssql->sstr.selection.sub_query_num++;
+		CONTEXT->sub_cons_num=0;
+		CONTEXT->from_length=0;
+		CONTEXT->select_length=0;
+		CONTEXT->value_length = 0;
+	  }
+	|SELECT SUM_T LBRACE ID DOT ID RBRACE FROM ID ID sub_where{
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]=malloc(sizeof(Selects));
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]->relation_num=0;
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]->aggfun_num=0;
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]->attr_num=0;
+		selects_append_relation(CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num], $9);
+		selects_append_conditions(CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]
+		, CONTEXT->sub_cons, CONTEXT->sub_cons_num);
+		AggFun aggre;
+		Init_AggFun_Rel(&aggre, SUM, $4, $6);
+		selects_append_alias(&CONTEXT->ssql->sstr.selection, $9,$10);
+		selects_append_aggfun(CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num],&aggre);
+
+		CONTEXT->ssql->sstr.selection.sub_query_num++;
+		CONTEXT->sub_cons_num=0;
+		CONTEXT->from_length=0;
+		CONTEXT->select_length=0;
+		CONTEXT->value_length = 0;
+	  }
+	|SELECT AVG_T LBRACE ID DOT ID RBRACE FROM ID ID sub_where{
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]=malloc(sizeof(Selects));
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]->relation_num=0;
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]->aggfun_num=0;
+		CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]->attr_num=0;
+
+		selects_append_relation(CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num], $9);
+		selects_append_conditions(CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num]
+		, CONTEXT->sub_cons, CONTEXT->sub_cons_num);
+		
+		AggFun aggre;
+		Init_AggFun_Rel(&aggre, AVG, $4, $6);
+		selects_append_alias(&CONTEXT->ssql->sstr.selection, $9,$10);
+		
+		selects_append_aggfun(CONTEXT->ssql->sstr.selection.sub_query[CONTEXT->ssql->sstr.selection.sub_query_num],&aggre);
+
+		CONTEXT->ssql->sstr.selection.sub_query_num++;
+		CONTEXT->sub_cons_num=0;
+		CONTEXT->from_length=0;
+		CONTEXT->select_length=0;
+		CONTEXT->value_length = 0;
+	  }
 	;
 	;
 join_list:
@@ -1177,6 +1358,46 @@ agg_fun_list_head:
 		
 		CONTEXT->select_length++;
 	  }
+	| COUNT_T LBRACE STAR RBRACE  ID agg_fun_list{
+		AggFun aggre;
+		Init_AggFun1(&aggre,COUNT_STAR,"*",$5);
+		selects_append_aggfun(&CONTEXT->ssql->sstr.selection,&aggre);
+
+	}
+	|COUNT_T LBRACE ID RBRACE  ID agg_fun_list{
+		AggFun aggre;
+		Init_AggFun1(&aggre,COUNT,$3,$5);
+		selects_append_aggfun(&CONTEXT->ssql->sstr.selection,&aggre);
+
+	}
+	| MAX_T LBRACE ID RBRACE  ID agg_fun_list{
+		AggFun aggre;
+		Init_AggFun1(&aggre, MAX, $3,$5);
+		selects_append_aggfun(&CONTEXT->ssql->sstr.selection, &aggre);
+
+		CONTEXT->select_length++;
+	  }
+	| MIN_T LBRACE ID RBRACE  ID agg_fun_list{
+		AggFun aggre;
+		Init_AggFun1(&aggre, MIN, $3,$5);
+		selects_append_aggfun(&CONTEXT->ssql->sstr.selection, &aggre);
+
+		CONTEXT->select_length++;
+	  }
+	| SUM_T LBRACE ID RBRACE  ID agg_fun_list{
+		AggFun aggre;
+		Init_AggFun1(&aggre, SUM, $3,$5);
+		selects_append_aggfun(&CONTEXT->ssql->sstr.selection, &aggre);
+	
+		CONTEXT->select_length++;
+	  }
+	| AVG_T LBRACE ID RBRACE  ID agg_fun_list{
+		AggFun aggre;
+		Init_AggFun1(&aggre, AVG, $3,$5);
+		selects_append_aggfun(&CONTEXT->ssql->sstr.selection, &aggre);
+		
+		CONTEXT->select_length++;
+	  }
 	;
 agg_fun_list:
 	
@@ -1247,6 +1468,42 @@ agg_fun_list:
 	| COMMA AVG_T LBRACE ID RBRACE AS ID agg_fun_list{
 		AggFun aggre;
 		Init_AggFun1(&aggre, AVG, $4,$7);
+		selects_append_aggfun(&CONTEXT->ssql->sstr.selection, &aggre);
+		CONTEXT->select_length++;
+	  }
+	| COMMA COUNT_T LBRACE STAR RBRACE  ID agg_fun_list{
+		AggFun aggre;
+		Init_AggFun1(&aggre,COUNT_STAR,"*",$6);
+		selects_append_aggfun(&CONTEXT->ssql->sstr.selection,&aggre);
+
+	}
+	|COMMA COUNT_T LBRACE ID RBRACE  ID agg_fun_list{
+		AggFun aggre;
+		Init_AggFun1(&aggre,COUNT,$4,$6);
+		selects_append_aggfun(&CONTEXT->ssql->sstr.selection,&aggre);
+
+	}
+	| COMMA MAX_T LBRACE ID RBRACE  ID agg_fun_list{
+		AggFun aggre;
+		Init_AggFun1(&aggre, MAX, $4,$6);
+		selects_append_aggfun(&CONTEXT->ssql->sstr.selection, &aggre);
+		CONTEXT->select_length++;
+	  }
+	| COMMA MIN_T LBRACE ID RBRACE  ID agg_fun_list{
+		AggFun aggre;
+		Init_AggFun1(&aggre, MIN, $4,$6);
+		selects_append_aggfun(&CONTEXT->ssql->sstr.selection, &aggre);
+		CONTEXT->select_length++;
+	  }
+	| COMMA SUM_T LBRACE ID RBRACE  ID agg_fun_list{
+		AggFun aggre;
+		Init_AggFun1(&aggre, SUM, $4,$6);
+		selects_append_aggfun(&CONTEXT->ssql->sstr.selection, &aggre);
+		CONTEXT->select_length++;
+	  }
+	| COMMA AVG_T LBRACE ID RBRACE  ID agg_fun_list{
+		AggFun aggre;
+		Init_AggFun1(&aggre, AVG, $4,$6);
 		selects_append_aggfun(&CONTEXT->ssql->sstr.selection, &aggre);
 		CONTEXT->select_length++;
 	  }
@@ -1332,6 +1589,10 @@ rel_list:
 	| COMMA ID AS ID rel_list{
 		selects_append_relation(&CONTEXT->ssql->sstr.selection, $2);
 		selects_append_alias(&CONTEXT->ssql->sstr.selection, $2,$4);
+	}
+	| COMMA ID ID rel_list{
+		selects_append_relation(&CONTEXT->ssql->sstr.selection, $2);
+		selects_append_alias(&CONTEXT->ssql->sstr.selection, $2,$3);
 	}
     ;
 where:

@@ -766,7 +766,7 @@ void dfs(std::vector<Table *> &tables, int step, const std::vector<Field> query_
   delete scan_oper;
 }
 RC gen_ret_of_aggfun(
-    SelectStmt *select_stmt, std::vector<std::pair<int, int>> &ret, std::vector<int> &char_len, std::stringstream &ss)
+    SelectStmt *select_stmt, std::vector<std::pair<int, int>> &ret, std::vector<int> &char_len, std::stringstream &ss,bool isprint)
 {
   RC rc = RC::SUCCESS;
   auto funs = select_stmt->funs();
@@ -788,8 +788,9 @@ RC gen_ret_of_aggfun(
     LOG_WARN("failed to open operator");
     return rc;
   }
-
+  if(isprint)
   print_aggfun_header(ss, funs);
+
   ret.resize(funs.size());
   char_len.resize(funs.size(), 0);
   init_ret_aggfun(ret, funs, char_len);

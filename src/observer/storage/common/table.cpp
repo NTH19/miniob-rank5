@@ -585,7 +585,7 @@ RC Table::make_record(int value_num, const Value *values, char *&record_out)
         s = (char*)malloc(4097);
         s[4096] = 0;
       } else {
-        s = (char*)malloc(len);
+        s = (char*)malloc(len+1);
       }
       memcpy(s, value.data, len > 4096 ? 4096 : len + 1);
       int result = insert_text(s);

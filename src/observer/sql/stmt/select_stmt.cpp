@@ -37,7 +37,8 @@ static void wildcard_fields(Table *table, std::vector<Field> &field_metas)
   }
 }
 
-RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out)
+RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
+    std::map<std::string, std::queue<std::string>> *alias_name_set)
 {
   if (nullptr == db) {
     LOG_WARN("invalid argument. db is null");
@@ -45,13 +46,23 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out)
   }
   std::map<std::string, std::queue<std::string>> alias_name_map;
   std::map<std::string, std::queue<std::string>> name_alias_map;
-  for (auto it = 0; it < select_sql.alias_num; it++)
-  // todo some deal
-  {
-    name_alias_map[std::string(select_sql.real_name[it])].push(std::string(select_sql.alias_name[it]));
-    alias_name_map [std::string(select_sql.alias_name[it])].push(std::string(select_sql.real_name[it]));
+  if (alias_name_set != nullptr) {
+    alias_name_map.swap(*alias_name_set);
+    std::map<std::string, std::queue<std::string>>::iterator iter;
+    for (iter = (*alias_name_set).begin(); iter != (*alias_name_set).end(); iter++) {
+      while (!iter->second.empty()) {
+        name_alias_map[iter->second.front()].push(iter->first);
+        iter->second.pop();
+      }
+    }
+  } else {
+    for (auto it = 0; it < select_sql.alias_num; it++)
+    // todo some deal
+    {
+      name_alias_map[std::string(select_sql.real_name[it])].push(std::string(select_sql.alias_name[it]));
+      alias_name_map[std::string(select_sql.alias_name[it])].push(std::string(select_sql.real_name[it]));
+    }
   }
-
   // collect tables in `from` statement
   std::vector<Table *> tables;
   std::unordered_map<std::string, Table *> table_map;
@@ -185,8 +196,14 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out)
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
 
-  RC rc = FilterStmt::create(
-      db, default_table, &table_map, select_sql.conditions, select_sql.condition_num, filter_stmt, &alias_name_map, out);
+  RC rc = FilterStmt::create(db,
+      default_table,
+      &table_map,
+      select_sql.conditions,
+      select_sql.condition_num,
+      filter_stmt,
+      &alias_name_map,
+      out);
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct filter stmt");
     return rc;

@@ -99,7 +99,7 @@ private:
   Stage *mem_storage_stage_ = nullptr;
 };
 RC gen_ret_of_aggfun(
-    SelectStmt *select_stmt, std::vector<std::pair<int, int>> &ret, std::vector<int> &char_len, std::stringstream &ss);
+    SelectStmt *select_stmt, std::vector<std::pair<int, int>> &ret, std::vector<int> &char_len, std::stringstream &ss,bool isprint=true);
 void agg_result(std::vector<std::pair<int, int>> &ret, const std::vector<std::pair<DescribeFun, Field>> &funs,
     std::vector<int> &char_len, std::vector<Value> &out_value);
 bool gen_compare_res(TupleCell &left_cell, TupleCell &right_cell, CompOp cmp);
