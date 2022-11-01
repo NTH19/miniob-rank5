@@ -1454,6 +1454,18 @@ select_attr:
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 			selects_append_alias2(&CONTEXT->ssql->sstr.selection, $1,$3,$5);
 		}
+	| ID  ID attr_list{
+		RelAttr attr;
+		relation_attr_init(&attr, NULL, $1);
+		selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+		selects_append_alias(&CONTEXT->ssql->sstr.selection, $1,$2);
+	}
+	| ID DOT ID  ID attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, $1, $3);
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_append_alias2(&CONTEXT->ssql->sstr.selection, $1,$3,$4);
+		}
     ;
 attr_list:
     /* empty */
@@ -1487,6 +1499,19 @@ attr_list:
 			relation_attr_init(&attr, $2, $4);
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 			selects_append_alias2(&CONTEXT->ssql->sstr.selection, $2,$4,$6);
+		}
+	| COMMA ID  ID attr_list{
+		RelAttr attr;
+		relation_attr_init(&attr, NULL, $2);
+		CONTEXT->ssql->sstr.selection.need_Revere=0;
+		selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+		selects_append_alias(&CONTEXT->ssql->sstr.selection, $2,$3);
+	}
+	| COMMA ID DOT ID  ID attr_list {
+			RelAttr attr;
+			relation_attr_init(&attr, $2, $4);
+			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
+			selects_append_alias2(&CONTEXT->ssql->sstr.selection, $2,$4,$5);
 		}
   	;
 

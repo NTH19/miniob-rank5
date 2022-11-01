@@ -67,13 +67,7 @@ void ProjectOperator::add_projection(
 
   int i = alias_set.count(std::string(field_meta->name()));
   int j = alias_set.count(std::string(table->name()));
-  if (!add_table) {
-    if (i > 0)
-      spec->set_alias(alias_set[std::string(field_meta->name())].front().c_str());
-    else
-      spec->set_alias(field_meta->name());
-  } else {// multi tables
-    const char *field_name = nullptr;
+  const char *field_name = nullptr;
     const char *table_name = nullptr;
     if (j > 0)
         table_name = alias_set[std::string(table->name())].front().c_str();
@@ -81,6 +75,17 @@ void ProjectOperator::add_projection(
         table_name = table->name();
     std::string alias1 = (std::string(table_name)).append(".").append(std::string(field_meta->name()));
     std::string alias2 = (std::string(table->name())).append(".").append(std::string(field_meta->name()));
+  if (!add_table) {
+    if (alias_set.count(alias1) > 0)
+      spec->set_alias(alias_set[alias1].front().c_str());
+    else if (alias_set.count(alias2) > 0) spec->set_alias(alias_set[alias2].front().c_str());
+    else {
+    if (i > 0)
+      spec->set_alias(alias_set[std::string(field_meta->name())].front().c_str());
+    else
+      spec->set_alias(field_meta->name());
+      }
+  } else {// multi tables
 
     if (alias_set.count(alias1) > 0)
       spec->set_alias(alias_set[alias1].front().c_str());
