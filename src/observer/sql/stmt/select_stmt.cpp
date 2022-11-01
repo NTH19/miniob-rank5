@@ -47,9 +47,9 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
   std::map<std::string, std::queue<std::string>> alias_name_map;
   std::map<std::string, std::queue<std::string>> name_alias_map;
   if (alias_name_set != nullptr) {
-    alias_name_map.swap(*alias_name_set);
+    alias_name_map=(*alias_name_set);
     std::map<std::string, std::queue<std::string>>::iterator iter;
-    for (iter = alias_name_map.begin(); iter != alias_name_map.end(); iter++) {
+    for (iter = (*alias_name_set).begin(); iter != (*alias_name_set).end(); iter++) {
       while (!iter->second.empty()) {
         name_alias_map[iter->second.front()].push(iter->first);
         iter->second.pop();
