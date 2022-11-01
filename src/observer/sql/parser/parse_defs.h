@@ -79,19 +79,26 @@ typedef struct _OrderBy {
 
 struct _Selects;
 
+enum Con_type{
+  ATTR,
+  VALUE,
+  CELLS,
+  NONE,
+  SEL
+};
+
 typedef struct _Condition {
-  int left_is_attr;    // TRUE if left-hand side is an attribute
+  enum Con_type left_type;    // TRUE if left-hand side is an attribute
                        // 1时，操作符左边是属性名，0时，是属性值
   Value left_value;    // left-hand side value if left_is_attr = FALSE
   RelAttr left_attr;   // left-hand side attribute
   CompOp comp;         // comparison operator
-  int right_is_attr;   // TRUE if right-hand side is an attribute
+  enum Con_type right_type;   // TRUE if right-hand side is an attribute
                        // 1时，操作符右边是属性名，0时，是属性值
   RelAttr right_attr;  // right-hand side attribute if right_is_attr = TRUE 右边的属性
   Value right_value;   // right-hand side value if right_is_attr = FALSE
-  int has_sel;
   int value_num;
-  struct _Selects *sel;
+  struct _Selects *sel[2];
   Value  values[MAX_NUM];
 } Condition;
 typedef struct {
@@ -118,6 +125,8 @@ struct _Selects{
    size_t    order_num;
   OrderBy   order_by[MAX_NUM];
   int dabiao;
+  int is_da;
+
 } ;
 typedef struct _Selects Selects;
 

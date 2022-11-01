@@ -43,9 +43,9 @@ public:
   FilterStmt *filter_stmt() const { return filter_stmt_; }
   const std::vector<std::pair<DescribeFun,Field>> & funs()const {return funs_;}
   int need_reverse;
-
   std::map<std::string,std::queue<std::string>> aliasset_;
   std::vector<std::pair<Field,int>>   order_fields;
+  bool is_da=0;
 
 private:
   std::vector<Field> query_fields_;

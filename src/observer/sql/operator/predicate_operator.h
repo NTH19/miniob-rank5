@@ -39,7 +39,8 @@ public:
   //int tuple_cell_num() const override;
   //RC tuple_cell_spec_at(int index, TupleCellSpec &spec) const override;
 private:
-  bool do_predicate(RowTuple &tuple);
+  int do_predicate(RowTuple &tuple);
 private:
   FilterStmt *filter_stmt_ = nullptr;
 };
+extern std::map<std::string,Tuple*>TableTupleMap;

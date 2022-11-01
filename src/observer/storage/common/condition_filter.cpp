@@ -75,7 +75,7 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition)
   AttrType type_right = UNDEFINED;
   bool _is_null_exist = 0;
 
-  if (1 == condition.left_is_attr) {
+  if (condition.left_type==ATTR) {
     left.is_attr = true;
     const FieldMeta *field_left = table_meta.field(condition.left_attr.attribute_name);
     if (nullptr == field_left) {
@@ -88,7 +88,7 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition)
     left.value = nullptr;
 
     type_left = field_left->type();
-  } else {
+  } else if(condition.left_type==VALUE){
     rc = Select_Date_Checker(condition.left_value);
     if(rc != RC::SUCCESS){
       LOG_WARN("Date invalid. %s.", table.name());
@@ -108,7 +108,7 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition)
     left.attr_offset = 0;
   }
 
-  if (1 == condition.right_is_attr) {
+  if (condition.right_type==ATTR) {
     right.is_attr = true;
     const FieldMeta *field_right = table_meta.field(condition.right_attr.attribute_name);
     if (nullptr == field_right) {
@@ -120,7 +120,7 @@ RC DefaultConditionFilter::init(Table &table, const Condition &condition)
     type_right = field_right->type();
 
     right.value = nullptr;
-  } else {
+  } else if(condition.right_type==VALUE){
     rc = Select_Date_Checker(condition.right_value);
     if(rc != RC::SUCCESS){
       LOG_WARN("Date invalid. %s.", table.name());

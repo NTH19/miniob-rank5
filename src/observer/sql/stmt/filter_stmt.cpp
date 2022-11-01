@@ -177,10 +177,48 @@ RC get_valuse_from_signle_field_select(std::vector<TupleCell> &values, SelectStm
 RC gen_filter_unit_from_query(FilterUnit *&filter_unit, const Condition &condition, Db *db,
     std::map<std::string, std::queue<std::string>> *alias_name_map)
 {
-  if (!condition.left_is_attr && condition.comp != EXIST && condition.comp != NOT_EXIST)
+
+
+  if ((condition.comp == EXIST || condition.comp == NOT_EXIST)&& condition.left_type!=NONE)
+
     return RC::GENERIC_ERROR;
+  if(condition.left_type==SEL && condition.right_type==SEL){
+
+    filter_unit->set_comp(condition.comp);
+    Stmt *stmt;
+    std::vector<TupleCell> tupe;
+    if (SelectStmt::create(db, *condition.sel[0], stmt) != RC::SUCCESS)
+      return RC::GENERIC_ERROR;
+    auto p = dynamic_cast<SelectStmt *>(stmt);
+
+    get_valuse_from_signle_field_select(tupe, p);
+    if (tupe.size() != 1)
+      return RC::GENERIC_ERROR;
+    filter_unit->set_comp(condition.comp);
+    auto val = new Value();
+    val->data = (void *)tupe[0].data();
+    val->type = tupe[0].attr_type();
+    auto right = new ValueExpr(*val);
+    filter_unit->set_right(right);
+
+    tupe.clear();
+    stmt=nullptr;
+    if (SelectStmt::create(db, *condition.sel[1], stmt) != RC::SUCCESS)
+      return RC::GENERIC_ERROR;
+    p = dynamic_cast<SelectStmt *>(stmt);
+    get_valuse_from_signle_field_select(tupe, p);
+    if (tupe.size() != 1)
+      return RC::GENERIC_ERROR;
+    val = new Value();
+    val->data = (void *)tupe[0].data();
+    val->type = tupe[0].attr_type();
+    auto left = new ValueExpr(*val);
+    filter_unit->set_left(left);\
+    return RC::SUCCESS;
+  }
   if (condition.comp == IN || condition.comp == NOT_IN) {
     if (condition.value_num) {
+      
       std::vector<TupleCell> tupe;
       tupe.resize(condition.value_num);
       Expression *ee = nullptr;
@@ -210,20 +248,24 @@ RC gen_filter_unit_from_query(FilterUnit *&filter_unit, const Condition &conditi
 
     Stmt *stmt;
     std::vector<TupleCell> tupe;
-    if (SelectStmt::create(db, *condition.sel, stmt, false, alias_name_map) != RC::SUCCESS)
+
+    if (SelectStmt::create(db, *condition.sel[1], stmt, true, alias_name_map) != RC::SUCCESS)
+
       return RC::GENERIC_ERROR;
     auto p = dynamic_cast<SelectStmt *>(stmt);
 
-    get_valuse_from_signle_field_select(tupe, p);
+    //get_valuse_from_signle_field_select(tupe, p);
     filter_unit = new FilterUnit;
     Expression *ee = nullptr;
     if (condition.comp == IN) {
       auto ex = new Inexpr();
+      ex->ptr=p;
       filter_unit->set_comp(IN);
       ex->tuplecells.swap(tupe);
       ee = ex;
     } else {
       auto ex = new NotInexpr();
+      ex->ptr=p;
       ex->tuplecells.swap(tupe);
       filter_unit->set_comp(NOT_IN);
       ee = ex;
@@ -232,7 +274,9 @@ RC gen_filter_unit_from_query(FilterUnit *&filter_unit, const Condition &conditi
 
   } else if (condition.comp == EXIST || condition.comp == NOT_EXIST) {
     Stmt *stmt;
-    if (SelectStmt::create(db, *condition.sel, stmt, true, alias_name_map) != RC::SUCCESS)
+
+    if (SelectStmt::create(db, *condition.sel[1], stmt, true, alias_name_map) != RC::SUCCESS)
+
       return RC::GENERIC_ERROR;
     auto p = dynamic_cast<SelectStmt *>(stmt);
     auto ex = new ExitsnotExits();
@@ -245,11 +289,22 @@ RC gen_filter_unit_from_query(FilterUnit *&filter_unit, const Condition &conditi
       ex->ee = ExprType::NOT_EXIST;
       filter_unit->set_comp(NOT_EXIST);
     }
-  } else {
+  }else {
     Stmt *stmt;
     std::vector<TupleCell> tupe;
-    if (SelectStmt::create(db, *condition.sel, stmt, false, alias_name_map) != RC::SUCCESS)
-      return RC::GENERIC_ERROR;
+
+    if (SelectStmt::create(db, *condition.sel[1], stmt,false,alias_name_map) != RC::SUCCESS)
+    {
+      if(SelectStmt::create(db, *condition.sel[1], stmt,true,alias_name_map) != RC::SUCCESS)return RC::GENERIC_ERROR;
+      auto p = dynamic_cast<SelectStmt *>(stmt);
+      filter_unit->set_comp(condition.comp);
+      auto right = new NormalCopExpr();
+      right->ptr=p;
+      filter_unit->set_right(right);
+      right->cmp=condition.comp;
+      return RC::SUCCESS;
+    }
+
     auto p = dynamic_cast<SelectStmt *>(stmt);
 
     get_valuse_from_signle_field_select(tupe, p);
@@ -277,13 +332,15 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
     LOG_WARN("invalid compare operator : %d", comp);
     return RC::INVALID_ARGUMENT;
   }
-  if (condition.has_sel || condition.value_num) {
+  if (condition.left_type==NONE || condition.left_type==SEL || condition.left_type==CELLS||
+   condition.right_type==NONE || condition.right_type==SEL || condition.right_type==CELLS ||condition.value_num) {
     filter_unit = new FilterUnit();
     if (gen_filter_unit_from_query(filter_unit, condition, db, alias_name_map) != RC::SUCCESS)
       return RC::GENERIC_ERROR;
+    if(condition.left_type==SEL && condition.right_type==SEL)return RC::SUCCESS;
     Expression *left = nullptr;
     AttrType left_type;
-    if (condition.left_is_attr) {
+    if (condition.left_type==ATTR) {
       Table *table = nullptr;
       const FieldMeta *field = nullptr;
 
@@ -304,7 +361,7 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
   Expression *left = nullptr;
   Expression *right = nullptr;
   AttrType left_type, right_type;
-  if (condition.left_is_attr) {
+  if (condition.left_type==ATTR) {
     Table *table = nullptr;
     const FieldMeta *field = nullptr;
     rc = get_table_and_field(db, default_table, tables, condition.left_attr, table, field, out, alias_name_map);
@@ -320,7 +377,7 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
     left_type = condition.left_value.type;
   }
 
-  if (condition.right_is_attr) {
+  if (condition.right_type==ATTR) {
     Table *table = nullptr;
     const FieldMeta *field = nullptr;
     rc = get_table_and_field(db, default_table, tables, condition.right_attr, table, field, out, alias_name_map);

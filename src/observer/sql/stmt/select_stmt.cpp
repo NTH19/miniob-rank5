@@ -196,14 +196,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
 
-  RC rc = FilterStmt::create(db,
-      default_table,
-      &table_map,
-      select_sql.conditions,
-      select_sql.condition_num,
-      filter_stmt,
-      &alias_name_map,
-      out);
+  RC rc = FilterStmt::create(db, default_table, &table_map,select_sql.conditions,select_sql.condition_num,filter_stmt,&alias_name_map,out);
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct filter stmt");
     return rc;
@@ -246,5 +239,6 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
   select_stmt->aliasset_.swap(name_alias_map);
   select_stmt->order_fields.swap(order_fields);
   stmt = select_stmt;
+  select_stmt->is_da=select_sql.is_da;
   return RC::SUCCESS;
 }
