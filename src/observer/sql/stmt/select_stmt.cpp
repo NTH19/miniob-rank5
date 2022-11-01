@@ -49,7 +49,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
   if (alias_name_set != nullptr) {
     alias_name_map.swap(*alias_name_set);
     std::map<std::string, std::queue<std::string>>::iterator iter;
-    for (iter = (*alias_name_set).begin(); iter != (*alias_name_set).end(); iter++) {
+    for (iter = alias_name_map.begin(); iter != alias_name_map.end(); iter++) {
       while (!iter->second.empty()) {
         name_alias_map[iter->second.front()].push(iter->first);
         iter->second.pop();
@@ -91,7 +91,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
   for (int i = select_sql.aggfun_num - 1; i >= 0; i--) {
     const RelAttr &relation_attr = select_sql.aggFun[i].attr;
     const char *alias_name = select_sql.aggFun[i].alias_name;
-    if (relation_attr.relation_name != nullptr && !table_map.count(std::string(relation_attr.relation_name))) {
+    if (relation_attr.relation_name != nullptr &&alias_name_map.count(relation_attr.relation_name)==0&&!table_map.count(std::string(relation_attr.relation_name))) {
       LOG_WARN("invalid table name in aggregate: %s", relation_attr.relation_name);
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }

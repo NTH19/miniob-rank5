@@ -332,8 +332,7 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
     LOG_WARN("invalid compare operator : %d", comp);
     return RC::INVALID_ARGUMENT;
   }
-  if (condition.left_type==NONE || condition.left_type==SEL || condition.left_type==CELLS||
-   condition.right_type==NONE || condition.right_type==SEL || condition.right_type==CELLS ||condition.value_num) {
+  if (condition.left_type==NONE || condition.left_type==SEL || condition.left_type==CELLS||condition.right_type==NONE || condition.right_type==SEL || condition.right_type==CELLS ||condition.value_num) {
     filter_unit = new FilterUnit();
     if (gen_filter_unit_from_query(filter_unit, condition, db, alias_name_map) != RC::SUCCESS)
       return RC::GENERIC_ERROR;

@@ -104,7 +104,7 @@ typedef struct _Condition {
 typedef struct {
   DescribeFun des;
   RelAttr attr;
-  const char * alias_name;
+   char * alias_name;
 } AggFun;
 struct _Selects{
   size_t attr_num;                // Length of attrs in Select clause
