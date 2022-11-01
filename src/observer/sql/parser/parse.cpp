@@ -213,7 +213,7 @@ void selects_append_conditions_start(Selects *selects, Condition conditions[], s
 {
   assert(end-start <= sizeof(selects->conditions) / sizeof(selects->conditions[0]));
   for (size_t i = start; i < end; i++) {
-    selects->conditions[i] = conditions[i];
+    selects->conditions[i - start] = conditions[i];
   }
   selects->condition_num = end-start;
 }
