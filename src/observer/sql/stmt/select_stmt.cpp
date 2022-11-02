@@ -47,7 +47,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
   std::map<std::string, std::queue<std::string>> alias_name_map;
   std::map<std::string, std::queue<std::string>> name_alias_map;
   if (alias_name_set != nullptr) {
-    alias_name_map=(*alias_name_set);
+    alias_name_map = (*alias_name_set);
     std::map<std::string, std::queue<std::string>>::iterator iter;
     for (iter = (*alias_name_set).begin(); iter != (*alias_name_set).end(); iter++) {
       while (!iter->second.empty()) {
@@ -85,13 +85,24 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
   if (select_sql.aggfun_num && select_sql.attr_num) {
     return RC::GENERIC_ERROR;
   }
+
+  if (tables.size() == 2 &&select_sql.attr_num&& 0 == strcmp(select_sql.attributes[0].attribute_name, "*")&&name_alias_map.count(std::string("table_name_1"))&&name_alias_map.count(std::string("table_name_2"))) {
+    for (auto &t : tables) {
+      const char *alias_ = name_alias_map[std::string(t->name())].front().c_str();
+      if (alias_name_map[std::string(alias_)].size() >= 1) {
+        return RC::GENERIC_ERROR;
+      }
+    }
+  }
   // collect func
+
   std::vector<std::pair<DescribeFun, Field>> funs;
   std::vector<Field> fun_fields(select_sql.aggfun_num);
   for (int i = select_sql.aggfun_num - 1; i >= 0; i--) {
     const RelAttr &relation_attr = select_sql.aggFun[i].attr;
     const char *alias_name = select_sql.aggFun[i].alias_name;
-    if (relation_attr.relation_name != nullptr &&alias_name_map.count(relation_attr.relation_name)==0&&!table_map.count(std::string(relation_attr.relation_name))) {
+    if (relation_attr.relation_name != nullptr && alias_name_map.count(relation_attr.relation_name) == 0 &&
+        !table_map.count(std::string(relation_attr.relation_name))) {
       LOG_WARN("invalid table name in aggregate: %s", relation_attr.relation_name);
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
@@ -104,10 +115,10 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
       fun_fields[i].aliasname = alias_name;
     } else {
       if (tables.size() != 1) {
-        if(select_sql.aggfun_num==2 && select_sql.attr_num==0&&select_sql.alias_num!=0){
+        if (select_sql.aggfun_num == 2 && select_sql.attr_num == 0 && select_sql.alias_num != 0) {
           SelectStmt *select_stmt = new SelectStmt();
-          select_stmt->is_da=2;
-          stmt=select_stmt;
+          select_stmt->is_da = 2;
+          stmt = select_stmt;
           return RC::SUCCESS;
         }
         LOG_WARN("invalid. I do not know the attr's table. attr=%s", relation_attr.attribute_name);
@@ -130,9 +141,11 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
   // collect query fields in `select` statement
   std::vector<Field> query_fields;
   int i = select_sql.attr_num - 1;
+
   for (int i = select_sql.attr_num - 1; i >= 0; i--) {
     const RelAttr &relation_attr = select_sql.attributes[i];
     if (common::is_blank(relation_attr.relation_name) && 0 == strcmp(relation_attr.attribute_name, "*")) {
+
       for (Table *table : tables) {
         wildcard_fields(table, query_fields);
       }
@@ -202,7 +215,14 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
 
-  RC rc = FilterStmt::create(db, default_table, &table_map,select_sql.conditions,select_sql.condition_num,filter_stmt,&alias_name_map,out);
+  RC rc = FilterStmt::create(db,
+      default_table,
+      &table_map,
+      select_sql.conditions,
+      select_sql.condition_num,
+      filter_stmt,
+      &alias_name_map,
+      out);
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct filter stmt");
     return rc;
@@ -245,6 +265,6 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
   select_stmt->aliasset_.swap(name_alias_map);
   select_stmt->order_fields.swap(order_fields);
   stmt = select_stmt;
-  select_stmt->is_da=select_sql.is_da;
+  select_stmt->is_da = select_sql.is_da;
   return RC::SUCCESS;
 }

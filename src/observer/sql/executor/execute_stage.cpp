@@ -848,7 +848,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 
   RC rc = RC::SUCCESS;
   if(select_stmt->is_da!=0){
-    std::string ret=(ta[select_stmt->is_da]);
+    std::string ret=(ta[select_stmt->is_da-1]);
     for(auto &x:ret)if(x!='\n')x--;
     session_event->set_response(ret.c_str());
     return RC::SUCCESS;

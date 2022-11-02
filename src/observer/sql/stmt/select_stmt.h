@@ -45,7 +45,7 @@ public:
   int need_reverse;
   std::map<std::string,std::queue<std::string>> aliasset_;
   std::vector<std::pair<Field,int>>   order_fields;
-  bool is_da=0;
+  int is_da=0;
 
 private:
   std::vector<Field> query_fields_;
