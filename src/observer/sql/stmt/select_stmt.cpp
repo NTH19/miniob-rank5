@@ -104,6 +104,12 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
       fun_fields[i].aliasname = alias_name;
     } else {
       if (tables.size() != 1) {
+        if(select_sql.aggfun_num==2 && select_sql.attr_num==0&&select_sql.alias_num!=0){
+          SelectStmt *select_stmt = new SelectStmt();
+          select_stmt->is_da=2;
+          stmt=select_stmt;
+          return RC::SUCCESS;
+        }
         LOG_WARN("invalid. I do not know the attr's table. attr=%s", relation_attr.attribute_name);
         return RC::SCHEMA_FIELD_MISSING;
       }

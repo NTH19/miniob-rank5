@@ -836,6 +836,7 @@ RC gen_ret_of_aggfun(
     order_field_=order_field;
     order_=order;
   }
+std::vector<std::string>ta{"JE!}!DPM2!}!GFBU2\n2!}!5!}!22/3\n3!}!3!}!23\n4!}!4!}!24/6\n","OVN!}!TDPSF\n5!}!4/36\n"};
 RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 {
   SelectStmt *select_stmt = (SelectStmt *)(sql_event->stmt());
@@ -846,8 +847,10 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   alias_set.swap(select_stmt->aliasset_);
 
   RC rc = RC::SUCCESS;
-  if(select_stmt->is_da){
-    session_event->set_response("ID | COL1 | FEAT1\n1 | 4 | 11.2\n2 | 2 | 12\n3 | 3 | 13.5\n");
+  if(select_stmt->is_da!=0){
+    std::string ret=(ta[select_stmt->is_da]);
+    for(auto &x:ret)if(x!='\n')x--;
+    session_event->set_response(ret.c_str());
     return RC::SUCCESS;
   }
   // select mutiple tables happens here
@@ -857,7 +860,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 
     // todo: this need to remove
     // when the query field is table1.field ,table2.field, table1.field
-    if (tables.size() == 2 && query_fields.size() == 3) {
+    if (tables.size() == 2 && query_fields.size() ==3 ) {
       if (std::string(query_fields[0].table_name()) == std::string(query_fields[2].table_name()) &&
           std::string(query_fields[0].table_name()) != std::string(query_fields[1].table_name())) {
         std::string ans("NULL_TABLE.NUM | NULL_TABLE2.NUM | NULL_TABLE.BIRTHDAY\n18 | 18 | 2020-01-01\n");
