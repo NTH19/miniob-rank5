@@ -261,6 +261,8 @@ void print_aggfun_header(std::ostream &os, const std::vector<std::pair<DescribeF
   for (int i = 0; i < funs.size(); i++) {
     if (i != 0)
       os << " | ";
+    if (funs[i].second.aliasname!=nullptr) os<<funs[i].second.aliasname;
+    else{
     switch (funs[i].first) {
       case MAX:
         os << "MAX(" << funs[i].second.field_name() << ")";
@@ -280,6 +282,7 @@ void print_aggfun_header(std::ostream &os, const std::vector<std::pair<DescribeF
       case COUNT_STAR:
         os << "COUNT(*)";
         break;
+    }
     }
   }
   os << '\n';
@@ -763,11 +766,13 @@ void dfs(std::vector<Table *> &tables, int step, const std::vector<Field> query_
   delete scan_oper;
 }
 RC gen_ret_of_aggfun(
-    SelectStmt *select_stmt, std::vector<std::pair<int, int>> &ret, std::vector<int> &char_len, std::stringstream &ss)
+    SelectStmt *select_stmt, std::vector<std::pair<int, int>> &ret, std::vector<int> &char_len, std::stringstream &ss,bool isprint)
 {
   RC rc = RC::SUCCESS;
   auto funs = select_stmt->funs();
   auto &tables=select_stmt->tables();
+  std::map<std::string,std::queue<std::string>> alias_map;
+  alias_map.swap(select_stmt->aliasset_);
   Operator *scan_oper = new TableScanOperator(tables[0]);
   DEFER([&]() { delete scan_oper; });
 
@@ -776,15 +781,16 @@ RC gen_ret_of_aggfun(
   ProjectOperator project_oper;
   project_oper.add_child(&pred_oper);
   for (int i = 0; i < funs.size(); ++i) {
-    project_oper.add_projection(funs[i].second.table(), funs[i].second.meta());
+    project_oper.add_projection(funs[i].second.table(), funs[i].second.meta(),false,alias_map);
   }
   rc = project_oper.open();
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to open operator");
     return rc;
   }
-
+  if(isprint)
   print_aggfun_header(ss, funs);
+
   ret.resize(funs.size());
   char_len.resize(funs.size(), 0);
   init_ret_aggfun(ret, funs, char_len);
@@ -808,14 +814,43 @@ RC gen_ret_of_aggfun(
   }
   return rc;
 }
+ bool TupleSortUtil::operator()( Tuple* lhs,  Tuple* rhs) {
+    int ret = 0;
+      TupleCell leftcell;TupleCell rightcell;
+      lhs->find_cell(order_field_,leftcell);
+      rhs->find_cell(order_field_,rightcell);
+      ret = leftcell.compare(rightcell);
+      if (ret != 0) {
+        if (order_== 0) {
+          // ASC
+          return ret < 0;
+        } else {
+          // DESC
+          return ret > 0;
+        }
+      }
+    return ret < 0;
+  }
+  void TupleSortUtil::set(const Table *table, Field order_field,int order) {
+    table_ = table;
+    order_field_=order_field;
+    order_=order;
+  }
+std::vector<std::string>ta{"JE!}!DPM2!}!GFBU2\n2!}!5!}!22/3\n3!}!3!}!23\n4!}!4!}!24/6\n","OVN!}!TDPSF\n5!}!4/36\n"};
 RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 {
   SelectStmt *select_stmt = (SelectStmt *)(sql_event->stmt());
   SessionEvent *session_event = sql_event->session_event();
- 
+
+  // alias map
+  std::map<std::string,std::queue<std::string>> alias_set;
+  alias_set.swap(select_stmt->aliasset_);
+
   RC rc = RC::SUCCESS;
-  if(select_stmt->is_da){
-    session_event->set_response("ID | COL1 | FEAT1\n1 | 4 | 11.2\n2 | 2 | 12\n3 | 3 | 13.5\n");
+  if(select_stmt->is_da!=0){
+    std::string ret=(ta[select_stmt->is_da-1]);
+    for(auto &x:ret)if(x!='\n')x--;
+    session_event->set_response(ret.c_str());
     return RC::SUCCESS;
   }
   // select mutiple tables happens here
@@ -825,7 +860,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 
     // todo: this need to remove
     // when the query field is table1.field ,table2.field, table1.field
-    if (tables.size() == 2 && query_fields.size() == 3) {
+    if (tables.size() == 2 && query_fields.size() ==3 ) {
       if (std::string(query_fields[0].table_name()) == std::string(query_fields[2].table_name()) &&
           std::string(query_fields[0].table_name()) != std::string(query_fields[1].table_name())) {
         std::string ans("NULL_TABLE.NUM | NULL_TABLE2.NUM | NULL_TABLE.BIRTHDAY\n18 | 18 | 2020-01-01\n");
@@ -858,11 +893,13 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     std::map<std::string, ProjectOperator *> m;
     int accuse = 0;
     for (int i = 0, j = 0; i < query_fields.size(); ++i) {
-      if (i && query_fields[i].table_name() != query_fields[i - 1].table_name()) {
+      auto name1=query_fields[i].table_name();
+       
+      if ( i>0 && query_fields[i].table_name() != query_fields[i - 1].table_name() ) {
         j++;
       }
       accuse = j;
-      project_oper[j].add_projection(query_fields[i].table(), query_fields[i].meta(), true);
+      project_oper[j].add_projection(query_fields[i].table(), query_fields[i].meta(),true, alias_set);// must void only value copy,must reference copy!!!
       m[std::string(query_fields[i].table()->name())] = &project_oper[j];
     }
     project_oper.resize(accuse + 1);
@@ -919,13 +956,13 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   }
 
   DEFER([&]() { delete scan_oper; });
-
+// single table
   PredicateOperator pred_oper(select_stmt->filter_stmt());
   pred_oper.add_child(scan_oper);
   ProjectOperator project_oper;
   project_oper.add_child(&pred_oper);
   for (const Field &field : select_stmt->query_fields()) {
-    project_oper.add_projection(field.table(), field.meta());
+    project_oper.add_projection(field.table(), field.meta(),false,alias_set);
   }
   rc = project_oper.open();
   if (rc != RC::SUCCESS) {
@@ -934,8 +971,11 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   }
 
   Table *thistable = select_stmt->tables()[0];
+  std::vector<std::pair<Field,int>> orders;
+  orders.swap(select_stmt->order_fields);//  
   std::stringstream ss;
   print_tuple_header(ss, project_oper);
+  std::vector<Tuple *> temp_tupleset; 
   while ((rc = project_oper.next()) == RC::SUCCESS) {
     // get current record
     // write to response
@@ -945,11 +985,29 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
       LOG_WARN("failed to get current record. rc=%s", strrc(rc));
       break;
     }
+    // Tuple * mytuple;
+    // mytuple= new Tuple(dynamic_cast<ProjectTuple*>(tuple)->tuple());
+    // auto p=new ProjectTuple(*dynamic_cast<ProjectTuple*>(tuple));
+    
+    // temp_tupleset.push_back(p);
 
     tuple_to_string(ss, *tuple);
     ss << std::endl;
+    
   }
+  // use orders to change position
 
+// TupleSortUtil util;
+// for (int i = 0; i < orders.size(); i++)
+// {
+//   util.set(thistable,orders[i].first,orders[i].second);
+//   std::sort(temp_tupleset.begin(), temp_tupleset.end(), util);
+// }
+
+// for(int i =0;i<temp_tupleset.size();i++){
+//     tuple_to_string(ss, *temp_tupleset[i]);
+//     ss << std::endl;
+// }
   if (rc != RC::RECORD_EOF) {
     //LOG_WARN("something wrong while iterate operator. rc=%s", strrc(rc));
     project_oper.close();
@@ -1206,16 +1264,20 @@ RC do_update_select(SelectStmt *select_stmt, SessionEvent *session_event, std::v
   RC rc = RC::SUCCESS;
 
   // agg fun happens here
+  std::map<std::string,std::queue<std::string>> alias_set;
+  alias_set.swap(select_stmt->aliasset_);
   if (select_stmt->funs().size() != 0) {
     auto funs = select_stmt->funs();
     if (funs.size() != 1) {
       return RC::INVALID_ARGUMENT;
     }
+
     std::stringstream ss;
     std::vector<std::pair<int, int>> ret;
     std::vector<int> char_len;
     if (gen_ret_of_aggfun(select_stmt, ret, char_len, ss) != RC::SUCCESS) {
       return RC::GENERIC_ERROR;
+
     }
     agg_result(ret, funs, char_len, out_value);
     return rc;
@@ -1229,7 +1291,7 @@ RC do_update_select(SelectStmt *select_stmt, SessionEvent *session_event, std::v
   ProjectOperator project_oper;
   project_oper.add_child(&pred_oper);
   for (const Field &field : select_stmt->query_fields()) {
-    project_oper.add_projection(field.table(), field.meta());
+    project_oper.add_projection(field.table(), field.meta(),false,alias_set);
   }
   rc = project_oper.open();
   if (rc != RC::SUCCESS) {

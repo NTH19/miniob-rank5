@@ -34,15 +34,18 @@ FilterStmt::~FilterStmt()
 }
 
 RC FilterStmt::create(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
-    const Condition *conditions, int condition_num, FilterStmt *&stmt,bool out)
+    const Condition *conditions, int condition_num, FilterStmt *&stmt,
+    std::map<std::string, std::queue<std::string>> *alias_name_map, bool out)
+
 {
   RC rc = RC::SUCCESS;
   stmt = nullptr;
 
   FilterStmt *tmp_stmt = new FilterStmt();
+  tmp_stmt->alias_name_map = alias_name_map;
   for (int i = 0; i < condition_num; i++) {
     FilterUnit *filter_unit = nullptr;
-    rc = create_filter_unit(db, default_table, tables, conditions[i], filter_unit,out);
+    rc = create_filter_unit(db, default_table, tables, conditions[i], filter_unit, tmp_stmt->alias_name_map, out);
     if (rc != RC::SUCCESS) {
       delete tmp_stmt;
       LOG_WARN("failed to create filter unit. condition index=%d", i);
@@ -56,26 +59,54 @@ RC FilterStmt::create(Db *db, Table *default_table, std::unordered_map<std::stri
 }
 
 RC get_table_and_field(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
-    const RelAttr &attr, Table *&table, const FieldMeta *&field,bool out =false)
+    const RelAttr &attr, Table *&table, const FieldMeta *&field, bool out = false,
+    std::map<std::string, std::queue<std::string>> *alias_name_map = nullptr)
+
 {
-  if (common::is_blank(attr.relation_name)) {
+  char *real_relation;
+  char *real_attr;
+  if (alias_name_map != nullptr && alias_name_map->size()) {
+    if (attr.relation_name == nullptr && alias_name_map->count(std::string(attr.attribute_name)) > 0 &&
+        (*alias_name_map)[std::string(attr.attribute_name)].front().find(".") != std::string::npos) {
+      int idx = (*alias_name_map)[std::string(attr.attribute_name)].front().find(".");
+      real_relation = strdup((*alias_name_map)[std::string(attr.attribute_name)].front().substr(0, idx).c_str());
+      real_attr = strdup((*alias_name_map)[std::string(attr.attribute_name)].front().substr(idx + 1).c_str());
+
+    } else {
+      if (attr.relation_name && alias_name_map->count(std::string(attr.relation_name)) > 0)
+        real_relation = strdup((*alias_name_map)[std::string(attr.relation_name)].front().c_str());
+      else
+        real_relation = attr.relation_name;
+      if (alias_name_map->count(std::string(attr.attribute_name)) > 0)
+        real_attr = strdup((*alias_name_map)[std::string(attr.attribute_name)].front().c_str());
+      else
+        real_attr = attr.attribute_name;
+    }
+
+  } else {
+    real_attr = attr.attribute_name;
+    real_relation = attr.relation_name;
+  }
+
+  if (common::is_blank(real_relation)) {
     table = default_table;
   } else if (nullptr != tables) {
-    auto iter = tables->find(std::string(attr.relation_name));
+    auto iter = tables->find(std::string(real_relation));
     if (iter != tables->end()) {
       table = iter->second;
-    }else if(out)table = db->find_table(attr.relation_name);
+    } else if (out)
+      table = db->find_table(real_relation);
   } else {
-    table = db->find_table(attr.relation_name);
+    table = db->find_table(real_relation);
   }
   if (nullptr == table) {
-    LOG_WARN("No such table: attr.relation_name: %s", attr.relation_name);
+    LOG_WARN("No such table: attr.relation_name: %s", real_relation);
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-  field = table->table_meta().field(attr.attribute_name);
+  field = table->table_meta().field(real_attr);
   if (nullptr == field) {
-    LOG_WARN("no such field in table: table %s, field %s", table->name(), attr.attribute_name);
+    LOG_WARN("no such field in table: table %s, field %s", table->name(), real_attr);
     table = nullptr;
     return RC::SCHEMA_FIELD_NOT_EXIST;
   }
@@ -89,7 +120,7 @@ RC get_valuse_from_signle_field_select(std::vector<TupleCell> &values, SelectStm
     std::vector<std::pair<int, int>> ret;
     std::vector<int> char_len;
     std::stringstream ss;
-    if (gen_ret_of_aggfun(select_stmt, ret, char_len, ss) != RC::SUCCESS)
+    if (gen_ret_of_aggfun(select_stmt, ret, char_len, ss, false) != RC::SUCCESS)
       return RC::GENERIC_ERROR;
     std::vector<Value> val;
     agg_result(ret, select_stmt->funs(), char_len, val);
@@ -100,6 +131,8 @@ RC get_valuse_from_signle_field_select(std::vector<TupleCell> &values, SelectStm
     return RC::SUCCESS;
   }
   Operator *scan_oper = new TableScanOperator(select_stmt->tables()[0]);
+  std::map<std::string, std::queue<std::string>> alias_set;
+  alias_set.swap(select_stmt->aliasset_);
 
   RC rc = RC::SUCCESS;
   PredicateOperator pred_oper(select_stmt->filter_stmt());
@@ -109,7 +142,7 @@ RC get_valuse_from_signle_field_select(std::vector<TupleCell> &values, SelectStm
   if (select_stmt->query_fields().size() != 1)
     return RC::GENERIC_ERROR;
   for (const Field &field : select_stmt->query_fields()) {
-    project_oper.add_projection(field.table(), field.meta());
+    project_oper.add_projection(field.table(), field.meta(), false, alias_set);
   }
   rc = project_oper.open();
   if (rc != RC::SUCCESS) {
@@ -141,9 +174,13 @@ RC get_valuse_from_signle_field_select(std::vector<TupleCell> &values, SelectStm
   return rc;
 }
 // has sel =true
-RC gen_filter_unit_from_query(FilterUnit *&filter_unit, const Condition &condition, Db *db)
+RC gen_filter_unit_from_query(FilterUnit *&filter_unit, const Condition &condition, Db *db,
+    std::map<std::string, std::queue<std::string>> *alias_name_map)
 {
+
+
   if ((condition.comp == EXIST || condition.comp == NOT_EXIST)&& condition.left_type!=NONE)
+
     return RC::GENERIC_ERROR;
   if(condition.left_type==SEL && condition.right_type==SEL){
 
@@ -185,11 +222,13 @@ RC gen_filter_unit_from_query(FilterUnit *&filter_unit, const Condition &conditi
       std::vector<TupleCell> tupe;
       tupe.resize(condition.value_num);
       Expression *ee = nullptr;
-      for(int i=0;i<condition.value_num;++i){
-        auto p=new int;
-        if(condition.values[i].data==nullptr)memcpy(p,__NULL_DATA__,4);
-        else memcpy(p,condition.values[i].data,4);
-        tupe[i].set_data((char*)p);
+      for (int i = 0; i < condition.value_num; ++i) {
+        auto p = new int;
+        if (condition.values[i].data == nullptr)
+          memcpy(p, __NULL_DATA__, 4);
+        else
+          memcpy(p, condition.values[i].data, 4);
+        tupe[i].set_data((char *)p);
         tupe[i].set_type(condition.values[i].type);
       }
       if (condition.comp == IN) {
@@ -207,10 +246,11 @@ RC gen_filter_unit_from_query(FilterUnit *&filter_unit, const Condition &conditi
       return RC::SUCCESS;
     }
 
-
     Stmt *stmt;
     std::vector<TupleCell> tupe;
-    if (SelectStmt::create(db, *condition.sel[1], stmt,true) != RC::SUCCESS)
+
+    if (SelectStmt::create(db, *condition.sel[1], stmt, true, alias_name_map) != RC::SUCCESS)
+
       return RC::GENERIC_ERROR;
     auto p = dynamic_cast<SelectStmt *>(stmt);
 
@@ -234,7 +274,9 @@ RC gen_filter_unit_from_query(FilterUnit *&filter_unit, const Condition &conditi
 
   } else if (condition.comp == EXIST || condition.comp == NOT_EXIST) {
     Stmt *stmt;
-    if (SelectStmt::create(db, *condition.sel[1], stmt,true) != RC::SUCCESS)
+
+    if (SelectStmt::create(db, *condition.sel[1], stmt, true, alias_name_map) != RC::SUCCESS)
+
       return RC::GENERIC_ERROR;
     auto p = dynamic_cast<SelectStmt *>(stmt);
     auto ex = new ExitsnotExits();
@@ -250,9 +292,10 @@ RC gen_filter_unit_from_query(FilterUnit *&filter_unit, const Condition &conditi
   }else {
     Stmt *stmt;
     std::vector<TupleCell> tupe;
-    if (SelectStmt::create(db, *condition.sel[1], stmt,false) != RC::SUCCESS)
+
+    if (SelectStmt::create(db, *condition.sel[1], stmt,false,alias_name_map) != RC::SUCCESS)
     {
-      if(SelectStmt::create(db, *condition.sel[1], stmt,true) != RC::SUCCESS)return RC::GENERIC_ERROR;
+      if(SelectStmt::create(db, *condition.sel[1], stmt,true,alias_name_map) != RC::SUCCESS)return RC::GENERIC_ERROR;
       auto p = dynamic_cast<SelectStmt *>(stmt);
       filter_unit->set_comp(condition.comp);
       auto right = new NormalCopExpr();
@@ -261,6 +304,7 @@ RC gen_filter_unit_from_query(FilterUnit *&filter_unit, const Condition &conditi
       right->cmp=condition.comp;
       return RC::SUCCESS;
     }
+
     auto p = dynamic_cast<SelectStmt *>(stmt);
 
     get_valuse_from_signle_field_select(tupe, p);
@@ -277,7 +321,9 @@ RC gen_filter_unit_from_query(FilterUnit *&filter_unit, const Condition &conditi
   return RC::SUCCESS;
 }
 RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
-    const Condition &condition, FilterUnit *&filter_unit,bool out)
+    const Condition &condition, FilterUnit *&filter_unit,
+    std::map<std::string, std::queue<std::string>> *alias_name_map, bool out)
+
 {
   RC rc = RC::SUCCESS;
 
@@ -286,10 +332,9 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
     LOG_WARN("invalid compare operator : %d", comp);
     return RC::INVALID_ARGUMENT;
   }
-  if (condition.left_type==NONE || condition.left_type==SEL || condition.left_type==CELLS||
-   condition.right_type==NONE || condition.right_type==SEL || condition.right_type==CELLS ||condition.value_num) {
+  if (condition.left_type==NONE || condition.left_type==SEL || condition.left_type==CELLS||condition.right_type==NONE || condition.right_type==SEL || condition.right_type==CELLS ||condition.value_num) {
     filter_unit = new FilterUnit();
-    if (gen_filter_unit_from_query(filter_unit, condition, db) != RC::SUCCESS)
+    if (gen_filter_unit_from_query(filter_unit, condition, db, alias_name_map) != RC::SUCCESS)
       return RC::GENERIC_ERROR;
     if(condition.left_type==SEL && condition.right_type==SEL)return RC::SUCCESS;
     Expression *left = nullptr;
@@ -298,7 +343,7 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
       Table *table = nullptr;
       const FieldMeta *field = nullptr;
 
-      rc = get_table_and_field(db, default_table, tables, condition.left_attr, table, field,out);
+      rc = get_table_and_field(db, default_table, tables, condition.left_attr, table, field, out, alias_name_map);
       if (rc != RC::SUCCESS) {
         LOG_WARN("cannot find attr");
         return rc;
@@ -318,8 +363,8 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
   if (condition.left_type==ATTR) {
     Table *table = nullptr;
     const FieldMeta *field = nullptr;
+    rc = get_table_and_field(db, default_table, tables, condition.left_attr, table, field, out, alias_name_map);
 
-    rc = get_table_and_field(db, default_table, tables, condition.left_attr, table, field,out);
     if (rc != RC::SUCCESS) {
       LOG_WARN("cannot find attr");
       return rc;
@@ -334,7 +379,8 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
   if (condition.right_type==ATTR) {
     Table *table = nullptr;
     const FieldMeta *field = nullptr;
-    rc = get_table_and_field(db, default_table, tables, condition.right_attr, table, field,out);
+    rc = get_table_and_field(db, default_table, tables, condition.right_attr, table, field, out, alias_name_map);
+
     if (rc != RC::SUCCESS) {
       LOG_WARN("cannot find attr");
       delete left;

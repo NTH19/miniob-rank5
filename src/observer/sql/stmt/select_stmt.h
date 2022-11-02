@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 #include "rc.h"
 #include "sql/stmt/stmt.h"
 #include "storage/common/field.h"
+# include<map>
 
 class FieldMeta;
 class FilterStmt;
@@ -34,7 +35,7 @@ public:
 
   StmtType type() const override { return StmtType::SELECT; }
 public:
-  static RC create(Db *db, const Selects &select_sql, Stmt *&stmt,bool outatble=false);
+  static RC create(Db *db, const Selects &select_sql, Stmt *&stmt,bool outatble = false,std::map<std::string, std::queue<std::string>>* alias_name_set=nullptr);
 
 public:
   const std::vector<Table *> &tables() const { return tables_; }
@@ -42,12 +43,16 @@ public:
   FilterStmt *filter_stmt() const { return filter_stmt_; }
   const std::vector<std::pair<DescribeFun,Field>> & funs()const {return funs_;}
   int need_reverse;
-  bool is_da=0;
+  std::map<std::string,std::queue<std::string>> aliasset_;
+  std::vector<std::pair<Field,int>>   order_fields;
+  int is_da=0;
+
 private:
   std::vector<Field> query_fields_;
   std::vector<Table *> tables_;
   std::vector<std::pair<DescribeFun,Field>> funs_;
   FilterStmt *filter_stmt_ = nullptr;
+  
   
 };
 

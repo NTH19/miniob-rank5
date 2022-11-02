@@ -22,8 +22,14 @@ RC parse(char *st, Query *sqln);
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
+void selects_append_order(Selects *selects, RelAttr *rel_attr, int order) {
+  selects->order_by[selects->order_num].attribute = *rel_attr;
+  selects->order_by[selects->order_num].order = order;
+  selects->order_num++;
+}
 void relation_attr_init(RelAttr *relation_attr, const char *relation_name, const char *attribute_name)
 {
+  
   if (relation_name != nullptr) {
     relation_attr->relation_name = strdup(relation_name);
   } else {
@@ -48,12 +54,14 @@ void value_init_integer(Value *value, int v)
 {
   value->type = INTS;
   value->data = malloc(sizeof(v));
+  value->_is_null = 0;
   memcpy(value->data, &v, sizeof(v));
 }
 void value_init_float(Value *value, float v)
 {
   value->type = FLOATS;
   value->data = malloc(sizeof(v));
+  value->_is_null = 0;
   memcpy(value->data, &v, sizeof(v));
 }
 
@@ -61,6 +69,7 @@ void value_init_string(Value *value, const char *v)
 {
   value->type = CHARS;
   value->data = strdup(v);
+  value->_is_null=0;
 }
 
 int value_init_date(Value* value, const char* v) {
@@ -71,6 +80,7 @@ int value_init_date(Value* value, const char* v) {
     if(!b) return -1;
     int dv = y*10000+m*100+d;
     value->data = malloc(sizeof(dv));//TODO:check malloc failure
+    value->_is_null = 0;
     memcpy(value->data, &dv, sizeof(dv));
     return 0;
 }
@@ -189,16 +199,45 @@ void selects_append_aggfun(Selects *selects, AggFun * a)
 {
   selects->aggFun[selects->aggfun_num++]=*a;
 }
+void selects_append_alias2(Selects *selects, const char *relation_name,const char * attr_name,const char* alias)
+{
+  selects->real_name[selects->alias_num]=strdup((new std::string(relation_name))->append(".").append(attr_name).c_str());
+  selects->alias_name[selects->alias_num]=strdup(alias);
+  selects->alias_num++;
+}
+void selects_append_alias3(Selects *selects, AggFun * a,const char* alias)
+{
+  char* i=(char*)&(a->des);
+  if (a->attr.relation_name) selects->real_name[selects->alias_num]=strdup((new std::string(a->attr.relation_name))->append(".").append(a->attr.attribute_name).c_str());
+  else selects->real_name[selects->alias_num]=strdup((new std::string(i))->append(".").append(a->attr.attribute_name).c_str());
+  selects->alias_name[selects->alias_num]=strdup(alias);
+  selects->alias_num++;
+  a->alias_name= strdup(alias);
+}
+void selects_append_alias(Selects *selects, const char * name,const char* alias)
+{
+  selects->real_name[selects->alias_num]=strdup(name);
+  selects->alias_name[selects->alias_num]=strdup(alias);
+  selects->alias_num++;
+}
 void Init_AggFun(AggFun * a, DescribeFun des, const char* arr_name){
   a->attr.attribute_name = strdup(arr_name);
   a->des = des;
   a->attr.relation_name=nullptr;
+  a->alias_name=nullptr;
 }
+void Init_AggFun1(AggFun * a, DescribeFun des, const char* arr_name,const char * alias_name){
+  a->attr.attribute_name = strdup(arr_name);
+  a->des = des;
+  a->attr.relation_name=nullptr;
+  a->alias_name=strdup(alias_name);
 
+}
 void Init_AggFun_Rel(AggFun *a, DescribeFun des, const char* rel_name, const char* arr_name) {
   a->attr.relation_name = strdup(rel_name);
   a->attr.attribute_name = strdup(arr_name);
   a->des = des;
+  a->alias_name=nullptr;
 }
 
 void selects_append_conditions(Selects *selects, Condition conditions[], size_t condition_num)
@@ -239,6 +278,17 @@ void selects_destroy(Selects *selects)
     relation_attr_destroy(&selects->aggFun[i].attr);
   }
   selects->aggfun_num = 0;
+  for(size_t i = 0; i < selects->alias_num; i++) {
+    free(selects->alias_name[i]);
+    free(selects->real_name[i]);
+    selects->alias_name[i]=NULL;
+    selects->real_name[i]-NULL;
+  }
+  selects->alias_num = 0;
+  for (size_t i = 0; i < selects->order_num; i++) {
+    relation_attr_destroy(&selects->attributes[i]);
+  }
+  selects->order_num = 0;
 }
 
 void inserts_init(Inserts *inserts, const char *relation_name, Value values[], size_t value_num,size_t single_record_length[], size_t record_num)

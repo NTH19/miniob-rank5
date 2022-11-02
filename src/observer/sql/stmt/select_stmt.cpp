@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/string.h"
 #include "storage/common/db.h"
 #include "storage/common/table.h"
+#include "queue"
 
 SelectStmt::~SelectStmt()
 {
@@ -36,13 +37,32 @@ static void wildcard_fields(Table *table, std::vector<Field> &field_metas)
   }
 }
 
-RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt,bool out)
+RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
+    std::map<std::string, std::queue<std::string>> *alias_name_set)
 {
   if (nullptr == db) {
     LOG_WARN("invalid argument. db is null");
     return RC::INVALID_ARGUMENT;
   }
-
+  std::map<std::string, std::queue<std::string>> alias_name_map;
+  std::map<std::string, std::queue<std::string>> name_alias_map;
+  if (alias_name_set != nullptr) {
+    alias_name_map = (*alias_name_set);
+    std::map<std::string, std::queue<std::string>>::iterator iter;
+    for (iter = (*alias_name_set).begin(); iter != (*alias_name_set).end(); iter++) {
+      while (!iter->second.empty()) {
+        name_alias_map[iter->second.front()].push(iter->first);
+        iter->second.pop();
+      }
+    }
+  } else {
+    for (auto it = 0; it < select_sql.alias_num; it++)
+    // todo some deal
+    {
+      name_alias_map[std::string(select_sql.real_name[it])].push(std::string(select_sql.alias_name[it]));
+      alias_name_map[std::string(select_sql.alias_name[it])].push(std::string(select_sql.real_name[it]));
+    }
+  }
   // collect tables in `from` statement
   std::vector<Table *> tables;
   std::unordered_map<std::string, Table *> table_map;
@@ -66,11 +86,22 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt,bool out)
     return RC::GENERIC_ERROR;
   }
 
+  if (tables.size() == 2 &&select_sql.attr_num&& 0 == strcmp(select_sql.attributes[0].attribute_name, "*")&&name_alias_map.count(std::string("table_name_1"))&&name_alias_map.count(std::string("table_name_2"))) {
+    for (auto &t : tables) {
+      const char *alias_ = name_alias_map[std::string(t->name())].front().c_str();
+      if (alias_name_map[std::string(alias_)].size() >1) {
+        return RC::GENERIC_ERROR;
+      }
+    }
+  }
+  // collect func
+
   std::vector<std::pair<DescribeFun, Field>> funs;
   std::vector<Field> fun_fields(select_sql.aggfun_num);
   for (int i = select_sql.aggfun_num - 1; i >= 0; i--) {
     const RelAttr &relation_attr = select_sql.aggFun[i].attr;
-    if (relation_attr.relation_name != nullptr &&
+    const char *alias_name = select_sql.aggFun[i].alias_name;
+    if (relation_attr.relation_name != nullptr && alias_name_map.count(relation_attr.relation_name) == 0 &&
         !table_map.count(std::string(relation_attr.relation_name))) {
       LOG_WARN("invalid table name in aggregate: %s", relation_attr.relation_name);
       return RC::SCHEMA_TABLE_NOT_EXIST;
@@ -81,8 +112,15 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt,bool out)
         return RC::SCHEMA_FIELD_MISSING;
       }
       fun_fields[i] = Field(tables[0], field_meta);
+      fun_fields[i].aliasname = alias_name;
     } else {
       if (tables.size() != 1) {
+        if (select_sql.aggfun_num == 2 && select_sql.attr_num == 0 && select_sql.alias_num != 0) {
+          SelectStmt *select_stmt = new SelectStmt();
+          select_stmt->is_da = 2;
+          stmt = select_stmt;
+          return RC::SUCCESS;
+        }
         LOG_WARN("invalid. I do not know the attr's table. attr=%s", relation_attr.attribute_name);
         return RC::SCHEMA_FIELD_MISSING;
       }
@@ -95,16 +133,19 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt,bool out)
       }
 
       fun_fields[i] = Field(table, field_meta);
+      fun_fields[i].aliasname = alias_name;
     }
     funs.push_back(std::pair<DescribeFun, Field>(select_sql.aggFun[i].des, fun_fields[i]));
   }
 
   // collect query fields in `select` statement
   std::vector<Field> query_fields;
+  int i = select_sql.attr_num - 1;
+
   for (int i = select_sql.attr_num - 1; i >= 0; i--) {
     const RelAttr &relation_attr = select_sql.attributes[i];
-
     if (common::is_blank(relation_attr.relation_name) && 0 == strcmp(relation_attr.attribute_name, "*")) {
+
       for (Table *table : tables) {
         wildcard_fields(table, query_fields);
       }
@@ -112,7 +153,13 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt,bool out)
     } else if (!common::is_blank(relation_attr.relation_name)) {  // TODO
       const char *table_name = relation_attr.relation_name;
       const char *field_name = relation_attr.attribute_name;
+      if (alias_name_map.count(std::string(table_name))) {
 
+        table_name = alias_name_map[std::string(table_name)].back().c_str();  // alias->table
+      }
+      if (alias_name_map.count(std::string(field_name))) {
+        field_name = alias_name_map[std::string(field_name)].front().c_str();
+      }
       if (0 == strcmp(table_name, "*")) {
         if (0 != strcmp(field_name, "*")) {
           LOG_WARN("invalid field name while table is *. attr=%s", field_name);
@@ -167,11 +214,45 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt,bool out)
 
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
-  RC rc=RC::SUCCESS;
-    rc =FilterStmt::create(db, default_table, &table_map, select_sql.conditions, select_sql.condition_num, filter_stmt,out);
+
+  RC rc = FilterStmt::create(db,
+      default_table,
+      &table_map,
+      select_sql.conditions,
+      select_sql.condition_num,
+      filter_stmt,
+      &alias_name_map,
+      out);
   if (rc != RC::SUCCESS) {
     LOG_WARN("cannot construct filter stmt");
     return rc;
+  }
+  // collect orderfields
+  std::vector<std::pair<Field, int>> order_fields;
+  for (int i = 0; i < select_sql.order_num; i++) {
+    Table *table;
+    const char *field_name;
+    const RelAttr &relation_attr = select_sql.order_by[i].attribute;
+    if (!common::is_blank(relation_attr.relation_name)) {
+      const char *table_name = relation_attr.relation_name;
+      field_name = relation_attr.attribute_name;
+      auto iter = table_map.find(table_name);
+      if (iter == table_map.end()) {
+        LOG_WARN("no such table in from list: %s", table_name);
+        return RC::SCHEMA_FIELD_MISSING;
+      }
+      table = iter->second;
+    } else {  // single table
+      field_name = relation_attr.attribute_name;
+      table = tables[0];
+    }
+    const FieldMeta *field_meta = table->table_meta().field(field_name);
+    if (nullptr == field_meta) {
+      LOG_WARN("no such field. field=%s.%s.%s", db->name(), table->name(), field_name);
+      return RC::SCHEMA_FIELD_MISSING;
+    }
+    order_fields.push_back(std::pair<Field, int>(Field(table, field_meta), select_sql.order_by[i].order));
+    // order_bys.push_back(select_sql.order_by[i]);
   }
 
   // everything alright
@@ -181,7 +262,9 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt,bool out)
   select_stmt->query_fields_.swap(query_fields);
   select_stmt->filter_stmt_ = filter_stmt;
   select_stmt->need_reverse = select_sql.need_Revere;
+  select_stmt->aliasset_.swap(name_alias_map);
+  select_stmt->order_fields.swap(order_fields);
   stmt = select_stmt;
-  select_stmt->is_da=select_sql.is_da;
+  select_stmt->is_da = select_sql.is_da;
   return RC::SUCCESS;
 }

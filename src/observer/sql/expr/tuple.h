@@ -196,6 +196,9 @@ public:
   {
     this->tuple_ = tuple;
   }
+  Tuple * tuple(){
+    return this->tuple_;
+  }
 
   void add_cell_spec(TupleCellSpec *spec)
   {

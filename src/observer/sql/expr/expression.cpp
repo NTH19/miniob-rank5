@@ -125,10 +125,12 @@ inline RC get_valuse_from_signle_field_select(std::vector<TupleCell> &values, Se
   pred_oper.add_child(scan_oper);
   ProjectOperator project_oper;
   project_oper.add_child(&pred_oper);
+  std::map<std::string, std::queue<std::string>> alias_set;
+  alias_set.swap(select_stmt->aliasset_);
   if (select_stmt->query_fields().size() != 1)
     return RC::GENERIC_ERROR;
   for (const Field &field : select_stmt->query_fields()) {
-    project_oper.add_projection(field.table(), field.meta());
+    project_oper.add_projection(field.table(), field.meta(),false,alias_set);
   }
   rc = project_oper.open();
   if (rc != RC::SUCCESS) {

@@ -16,7 +16,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/operator/operator.h"
 #include "rc.h"
-
+#include "queue"
 class ProjectOperator : public Operator
 {
 public:
@@ -25,7 +25,7 @@ public:
 
   virtual ~ProjectOperator() = default;
 
-  void add_projection(const Table *table, const FieldMeta *field,bool add_table=false);
+  void add_projection(const Table *table, const FieldMeta *field,bool add_table,std::map<std::string,std::queue<std::string>> &);
 
   RC open() override;
   RC next() override;

@@ -7,6 +7,7 @@ struct ParserContext;
 #include "yacc_sql.tab.h"
 extern int atoi();
 extern double atof();
+#define YYDEBUG   1
 #if YYDEBUG > 0
 #define debug_printf  printf
 #else
@@ -56,6 +57,7 @@ DOUBLE_QUOTE     [\"]
 [Ss][Ee][Ll][Ee][Cc][Tt]                             RETURN_TOKEN(SELECT);
 [Ff][Rr][Oo][Mm]                                     RETURN_TOKEN(FROM);
 [Ww][Hh][Ee][Rr][Ee]                                 RETURN_TOKEN(WHERE);
+[Aa][Ss]                                             RETURN_TOKEN(AS);
 [Aa][Nn][Dd]                                         RETURN_TOKEN(AND);
 [Ii][Nn][Ss][Ee][rR][tT]                             RETURN_TOKEN(INSERT);
 [Ii][Nn][Tt][Oo]                                     RETURN_TOKEN(INTO);
@@ -89,6 +91,9 @@ DOUBLE_QUOTE     [\"]
 [Nn][Uu][Ll][Ll]						                         RETURN_TOKEN(NULLL);
 [Nn][Uu][Ll][Ll][Aa][Bb][Ll][Ee]		                 RETURN_TOKEN(NULLABLE);
 [Uu][Nn][Ii][Qq][Uu][Ee]                             RETURN_TOKEN(UNIQUE);
+[Oo][Rr][Dd][Ee][Rr]                                 RETURN_TOKEN(ORDER);
+[Bb][Yy]                                             RETURN_TOKEN(BY);
+[Aa][Ss][Cc]                                         RETURN_TOKEN(ASC);
 {ID}                                                 yylval->string=strdup(yytext); RETURN_TOKEN(ID);
 "("                                                  RETURN_TOKEN(LBRACE);
 ")"                                                  RETURN_TOKEN(RBRACE);

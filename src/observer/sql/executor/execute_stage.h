@@ -49,7 +49,16 @@ See the Mulan PSL v2 for more details. */
 #include "storage/clog/clog.h"
 #include "util/util.h"
 #include "rc.h"
-
+#include "../expr/tuple.h"
+class TupleSortUtil {
+public:
+bool operator ()( Tuple* lhs,  Tuple* rhs);
+void set(const Table *table, Field order_field,int order);
+private:
+  const Table *table_;
+  Field order_field_;
+  int order_;
+};
 class SQLStageEvent;
 class SessionEvent;
 class SelectStmt;
@@ -90,7 +99,7 @@ private:
   Stage *mem_storage_stage_ = nullptr;
 };
 RC gen_ret_of_aggfun(
-    SelectStmt *select_stmt, std::vector<std::pair<int, int>> &ret, std::vector<int> &char_len, std::stringstream &ss);
+    SelectStmt *select_stmt, std::vector<std::pair<int, int>> &ret, std::vector<int> &char_len, std::stringstream &ss,bool isprint=true);
 void agg_result(std::vector<std::pair<int, int>> &ret, const std::vector<std::pair<DescribeFun, Field>> &funs,
     std::vector<int> &char_len, std::vector<Value> &out_value);
 bool gen_compare_res(TupleCell &left_cell, TupleCell &right_cell, CompOp cmp);

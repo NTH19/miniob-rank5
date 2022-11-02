@@ -14,7 +14,6 @@ See the Mulan PSL v2 for more details. */
 
 #ifndef __OBSERVER_SQL_PARSER_PARSE_DEFS_H__
 #define __OBSERVER_SQL_PARSER_PARSE_DEFS_H__
-
 #include <stddef.h>
 
 #define MAX_NUM 20
@@ -72,7 +71,14 @@ typedef struct _Value {
   void *data;     // value
   int _is_null;
 } Value;
+
+typedef struct _OrderBy {
+  RelAttr attribute;  // order by this attribute
+  int     order;      // 0:asc, 1:desc
+} OrderBy;
+
 struct _Selects;
+
 enum Con_type{
   ATTR,
   VALUE,
@@ -80,6 +86,7 @@ enum Con_type{
   NONE,
   SEL
 };
+
 typedef struct _Condition {
   enum Con_type left_type;    // TRUE if left-hand side is an attribute
                        // 1时，操作符左边是属性名，0时，是属性值
@@ -97,6 +104,7 @@ typedef struct _Condition {
 typedef struct {
   DescribeFun des;
   RelAttr attr;
+   char * alias_name;
 } AggFun;
 struct _Selects{
   size_t attr_num;                // Length of attrs in Select clause
@@ -111,13 +119,16 @@ struct _Selects{
   int sub_query_num;
   int need_Revere;
   int need_reverse_join;
+  char * real_name[MAX_NUM];
+  char * alias_name[MAX_NUM];
+  size_t alias_num;
+   size_t    order_num;
+  OrderBy   order_by[MAX_NUM];
+  int dabiao;
   int is_da;
+
 } ;
 typedef struct _Selects Selects;
-
-
-
-// struct of select
 
 
 // struct of insert
@@ -265,10 +276,16 @@ void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, size_t
 void attr_info_destroy(AttrInfo *attr_info);
 
 void Init_AggFun(AggFun * a, DescribeFun des, const char* arr_name);
+void Init_AggFun1(AggFun * a, DescribeFun des, const char* arr_name,const char * alias_name);
 void Init_AggFun_Rel(AggFun *a, DescribeFun des, const char* rel_name, const char* arr_name);
 
 void selects_init(Selects *selects, ...);
 void selects_append_aggfun(Selects *selects, AggFun * a);
+void selects_append_order(Selects *selects, RelAttr *rel_attr, int order);
+void selects_append_alias(Selects *selects, const char *name,const char *alias_name);
+void selects_append_alias2(Selects *selects, const char *name,const char *rname,const char *alias_name);
+void selects_append_alias3(Selects *selects, AggFun * a,const char* alias);
+
 void selects_append_attribute(Selects *selects, RelAttr *rel_attr);
 void selects_append_relation(Selects *selects, const char *relation_name);
 void selects_append_conditions(Selects *selects, Condition conditions[], size_t condition_num);
