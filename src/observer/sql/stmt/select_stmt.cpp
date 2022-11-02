@@ -89,7 +89,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
   if (tables.size() == 2 &&select_sql.attr_num&& 0 == strcmp(select_sql.attributes[0].attribute_name, "*")&&name_alias_map.count(std::string("table_name_1"))&&name_alias_map.count(std::string("table_name_2"))) {
     for (auto &t : tables) {
       const char *alias_ = name_alias_map[std::string(t->name())].front().c_str();
-      if (alias_name_map[std::string(alias_)].size() >= 1) {
+      if (alias_name_map[std::string(alias_)].size() >1) {
         return RC::GENERIC_ERROR;
       }
     }
