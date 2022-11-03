@@ -28,7 +28,7 @@ typedef struct {
   char *attribute_name;  // attribute name              属性名
 } RelAttr;
 
-typedef enum {
+typedef enum _CompOp{
   EQUAL_TO,     //"="     0
   LESS_EQUAL,   //"<="    1
   NOT_EQUAL,    //"<>"    2
@@ -79,6 +79,34 @@ typedef struct _OrderBy {
 
 struct _Selects;
 
+typedef struct {
+  DescribeFun des;
+  RelAttr attr;
+   char * alias_name;
+} AggFun;
+
+typedef enum _AstExprType {
+  VALUE_EXPR,
+  ATTR_EXPR,
+  AGG_EXPR,
+  ADD_OP,
+  SUB_OP,
+  MUL_OP,
+  DIV_OP,
+} AstExprType;
+
+typedef struct _AstExpr {
+  AstExprType type;
+  union {
+    Value value;
+    RelAttr attr;
+    AggFun agg;
+  };
+  int need_append;
+  struct _AstExpr *left;
+  struct _AstExpr *right;
+} AstExpr;
+
 enum Con_type{
   ATTR,
   VALUE,
@@ -100,15 +128,18 @@ typedef struct _Condition {
   int value_num;
   struct _Selects *sel[2];
   Value  values[MAX_NUM];
+
+  AstExpr *left_expr;
+  AstExpr *right_expr;
 } Condition;
-typedef struct {
-  DescribeFun des;
-  RelAttr attr;
-   char * alias_name;
-} AggFun;
+
 struct _Selects{
   size_t attr_num;                // Length of attrs in Select clause
   RelAttr attributes[MAX_NUM];    // attrs in Select clause
+  // normal column attrs are in attributes.
+  // complex expressions are in attr_expr.
+  size_t expr_num;                
+  AstExpr attr_expr[MAX_NUM];
   size_t relation_num;            // Length of relations in Fro clause
   size_t aggfun_num;
   char *relations[MAX_NUM];       // relations in From clause
@@ -270,6 +301,9 @@ void value_destroy(Value *value);
  int  check_date(int y, int m, int d);
 void condition_init(Condition *condition, CompOp comp, int left_is_attr, RelAttr *left_attr, Value *left_value,
     int right_is_attr, RelAttr *right_attr, Value *right_value);
+
+void condition_init_from_expr(Condition *condition, CompOp comp, AstExpr *left, AstExpr *right);
+
 void condition_destroy(Condition *condition);
 
 void attr_info_init(AttrInfo *attr_info, const char *name, AttrType type, size_t length, int nullable);
@@ -281,14 +315,17 @@ void Init_AggFun_Rel(AggFun *a, DescribeFun des, const char* rel_name, const cha
 
 void selects_init(Selects *selects, ...);
 void selects_append_aggfun(Selects *selects, AggFun * a);
+void selects_reverse_append_aggfun(Selects *selects, AggFun * a);
 void selects_append_order(Selects *selects, RelAttr *rel_attr, int order);
 void selects_append_alias(Selects *selects, const char *name,const char *alias_name);
 void selects_append_alias2(Selects *selects, const char *name,const char *rname,const char *alias_name);
 void selects_append_alias3(Selects *selects, AggFun * a,const char* alias);
 
 void selects_append_attribute(Selects *selects, RelAttr *rel_attr);
+void selects_reverse_append_attribute(Selects *selects, RelAttr *rel_attr);
 void selects_append_relation(Selects *selects, const char *relation_name);
 void selects_append_conditions(Selects *selects, Condition conditions[], size_t condition_num);
+void selects_append_expr(Selects *selects, AstExpr *expr);
 void selects_destroy(Selects *selects);
 
 void inserts_init(Inserts *inserts, const char *relation_name, Value values[], size_t value_num,size_t single_record_length[], size_t record_num);
@@ -326,6 +363,11 @@ void desc_table_destroy(DescTable *desc_table);
 
 void load_data_init(LoadData *load_data, const char *relation_name, const char *file_name);
 void load_data_destroy(LoadData *load_data);
+
+AstExpr *create_value_expr(Value *value);
+AstExpr *create_attr_expr(RelAttr *attr, int need_append);
+AstExpr *create_agg_expr(AggFun *agg, int need_append);
+AstExpr *create_astexpr(AstExprType type, AstExpr *left, AstExpr *right);
 
 void query_init(Query *query);
 Query *query_create();  // create and init
