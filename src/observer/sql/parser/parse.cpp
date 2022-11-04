@@ -45,6 +45,26 @@ void relation_attr_destroy(RelAttr *relation_attr)
   relation_attr->relation_name = nullptr;
   relation_attr->attribute_name = nullptr;
 }
+
+void value_init_astexpr(AstExpr *expr, Value *value) {
+  if (expr->type == VALUE_EXPR) {
+    *value = expr->value;
+  } else if (expr->type == SUB_OP && expr->right->type == VALUE_EXPR) {
+    *value = expr->right->value;
+    if(value->type == INTS) {
+      int val = *(int *)value->data;
+      *(int *)value->data = -val;
+    } else if (value->type == FLOATS) {
+      float val = *(float *)value->data;
+      *(float *)value->data = -val;
+    } else {
+      LOG_PANIC("invalid expr 1");
+    }
+  } else {
+    LOG_PANIC("invalid expr 2");
+  }
+}
+
 void value_init_null(Value *value) {
   value->data = nullptr;
   value->type = UNDEFINED;
@@ -165,6 +185,7 @@ void condition_init_from_expr(Condition *condition, CompOp comp, AstExpr *left, 
     condition->left_type = ATTR;
   } else {
     condition->left_expr = left;
+    condition->left_type = AST_EXPR;
   }
 
   if (right->type == AstExprType::VALUE_EXPR) {
@@ -175,6 +196,7 @@ void condition_init_from_expr(Condition *condition, CompOp comp, AstExpr *left, 
     condition->right_type = ATTR;
   } else {
     condition->right_expr = right;
+    condition->right_type = AST_EXPR;
   }
 }
 
@@ -592,6 +614,8 @@ AstExpr *create_value_expr(Value *value) {
   AstExpr *expr = (AstExpr *)malloc(sizeof(AstExpr));
   expr->type = AstExprType::VALUE_EXPR;
   expr->value = *value;
+  expr->left_brackets = 0;
+  expr->right_brackets = 0;
   expr->left = nullptr;
   expr->right = nullptr;
   return expr;
@@ -600,6 +624,8 @@ AstExpr *create_value_expr(Value *value) {
 AstExpr *create_attr_expr(RelAttr *attr, int need_append) {
   AstExpr *expr = (AstExpr *)malloc(sizeof(AstExpr));
   expr->type = AstExprType::ATTR_EXPR;
+  expr->left_brackets = 0;
+  expr->right_brackets = 0;
   expr->attr = *attr;
   expr->need_append = need_append;
   expr->left = nullptr;
@@ -611,6 +637,8 @@ AstExpr *create_agg_expr(AggFun *agg, int need_append) {
   AstExpr *expr = (AstExpr *)malloc(sizeof(AstExpr));
   expr->type = AstExprType::AGG_EXPR;
   expr->agg = *agg;
+  expr->left_brackets = 0;
+  expr->right_brackets = 0;
   expr->need_append = need_append;
   expr->left = nullptr;
   expr->right = nullptr;
@@ -620,6 +648,8 @@ AstExpr *create_agg_expr(AggFun *agg, int need_append) {
 AstExpr *create_astexpr(AstExprType type, AstExpr *left, AstExpr *right) {
   AstExpr *expr = (AstExpr *)malloc(sizeof(AstExpr));
   expr->type = type;
+  expr->left_brackets = 0;
+  expr->right_brackets = 0;
   expr->left = left;
   expr->right = right;
   return expr;

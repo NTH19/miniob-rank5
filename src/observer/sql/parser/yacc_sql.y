@@ -414,16 +414,22 @@ record_list:
 	;
 
 record:
-	| LBRACE value value_list RBRACE
+	| LBRACE insert_value value_list RBRACE
 		{
 			CONTEXT->single_record_length[CONTEXT->record_length] = CONTEXT->value_length;
 			CONTEXT->record_length++;
 		};
 value_list:
-    | COMMA value value_list  { 
+    | COMMA insert_value value_list  { 
   		// CONTEXT->values[CONTEXT->value_length++] = *$2;
 	  }
     ;
+
+insert_value:
+	expr {
+		value_init_astexpr($1, &CONTEXT->values[CONTEXT->value_length - 1]);
+	};
+
 value:
     NUMBER{	
   		value_init_integer(&CONTEXT->values[CONTEXT->value_length++], $1);
@@ -469,7 +475,7 @@ update_attr_list:
 	;
 
 update_attr:
-	ID EQ value
+	ID EQ insert_value
 		{
 			updates_append_value(&CONTEXT->ssql->sstr.update, &CONTEXT->values[CONTEXT->value_length - 1]);
 			updates_append_attr(&CONTEXT->ssql->sstr.update, $1);
@@ -2202,6 +2208,9 @@ expr:
 		$$ = create_astexpr(DIV_OP, $1, $3);
 	}
 	| LBRACE expr RBRACE {
+		AstExpr *astExpr = (AstExpr *)$2;
+		astExpr->left_brackets ++;
+		astExpr->right_brackets ++;
 		$$ = $2;
 	}
 	| value {

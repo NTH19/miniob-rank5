@@ -24,6 +24,7 @@ See the Mulan PSL v2 for more details. */
 #include "../executor/execute_stage.h"
 #include "../operator/table_scan_operator.h"
 #include "select_stmt.h"
+#include "util/util.h"
 
 FilterStmt::~FilterStmt()
 {
@@ -371,6 +372,12 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
     }
     left = new FieldExpr(table, field);
     left_type = field->type();
+  } else if (condition.left_type == Con_type::AST_EXPR) {
+    rc = valid_expr(condition.left_expr, default_table, tables);
+    if (rc != RC::SUCCESS) {
+      return rc;
+    }
+    left = create_expr(condition.left_expr, default_table, tables);
   } else {
     left = new ValueExpr(condition.left_value);
     left_type = condition.left_value.type;
@@ -388,6 +395,12 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
     }
     right = new FieldExpr(table, field);
     right_type = field->type();
+  } else if (condition.right_type == Con_type::AST_EXPR) {
+    rc = valid_expr(condition.right_expr, default_table, tables);
+    if (rc != RC::SUCCESS) {
+      return rc;
+    }
+    right = create_expr(condition.right_expr, default_table, tables);
   } else {
     right = new ValueExpr(condition.right_value);
     right_type = condition.right_value.type;

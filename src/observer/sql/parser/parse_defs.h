@@ -102,6 +102,9 @@ typedef struct _AstExpr {
     RelAttr attr;
     AggFun agg;
   };
+  // 左右括号的数量
+  int left_brackets;
+  int right_brackets;
   int need_append;
   struct _AstExpr *left;
   struct _AstExpr *right;
@@ -112,7 +115,8 @@ enum Con_type{
   VALUE,
   CELLS,
   NONE,
-  SEL
+  SEL,
+  AST_EXPR
 };
 
 typedef struct _Condition {
@@ -292,6 +296,8 @@ extern "C" {
 void relation_attr_init(RelAttr *relation_attr, const char *relation_name, const char *attribute_name);
 void relation_attr_destroy(RelAttr *relation_attr);
 
+// 因为value无法解析负数，所以从expr中获取负数value
+void value_init_astexpr(AstExpr *expr, Value *value);
 void value_init_integer(Value *value, int v);
 void value_init_float(Value *value, float v);
 void value_init_string(Value *value, const char *v);

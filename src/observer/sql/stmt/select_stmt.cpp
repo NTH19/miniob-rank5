@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/stmt/select_stmt.h"
 #include "sql/stmt/filter_stmt.h"
+#include "util/util.h"
 #include "common/log/log.h"
 #include "common/lang/string.h"
 #include "storage/common/db.h"
@@ -36,6 +37,7 @@ static void wildcard_fields(Table *table, std::vector<Field> &field_metas)
     field_metas.push_back(Field(table, table_meta.field(i)));
   }
 }
+
 
 RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
     std::map<std::string, std::queue<std::string>> *alias_name_set)
@@ -212,6 +214,20 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
     default_table = tables[0];
   }
 
+  // expression
+  for(int i = select_sql.expr_num - 1; i >= 0; i--) {
+    RC rc = valid_expr(&select_sql.attr_expr[i], default_table, &table_map);
+    if (rc != RC::SUCCESS) {
+      return rc;
+    }
+  }
+  std::vector<AstExpression *> ast_exprs;
+  for(int i = select_sql.expr_num - 1; i >= 0; i--) {
+    auto ast_expression = create_expr(&select_sql.attr_expr[i], default_table, &table_map);
+    expr2string(const_cast<AstExpr *>(&select_sql.attr_expr[i]), &ast_expression->alias);
+    ast_exprs.push_back(ast_expression);
+  }
+
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
 
@@ -266,5 +282,6 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
   select_stmt->order_fields.swap(order_fields);
   stmt = select_stmt;
   select_stmt->is_da = select_sql.is_da;
+  select_stmt->ast_exprs_.swap(ast_exprs);
   return RC::SUCCESS;
 }

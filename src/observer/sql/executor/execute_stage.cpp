@@ -964,6 +964,11 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   for (const Field &field : select_stmt->query_fields()) {
     project_oper.add_projection(field.table(), field.meta(),false,alias_set);
   }
+  
+  for(AstExpression * ast_expr : select_stmt->ast_exprs_) {
+    project_oper.add_expr_projection(ast_expr);
+  }
+
   rc = project_oper.open();
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to open operator");

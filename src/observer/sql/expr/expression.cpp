@@ -262,3 +262,92 @@ bool ExitsnotExits::do_compare(Tuple *left)
   delete scan_oper2;
   return canAdd;
 }
+
+TupleCell null_cell() {
+  TupleCell cell;
+  char *data = new char[4];
+  memcpy(data, __NULL_DATA__, 4);
+  cell.set_data(data);
+  cell.set_type(CHARS);
+  cell.set_length(4);
+  return cell;
+}
+
+float cell2float(TupleCell &cell) {
+  if (cell.attr_type() == INTS) {
+    return *(int *)cell.data();
+  } else if(cell.attr_type() == FLOATS) {
+    return *(float *)cell.data();
+  } else {
+    return 0;
+  }
+}
+
+TupleCell cell_from_float(float val) {
+  TupleCell cell;
+  float *value = new float(val);
+  cell.set_data((char *)value);
+  cell.set_type(FLOATS);
+  return cell;
+}
+
+TupleCell calculate(const AstExpression *ast_expr, const Tuple &tuple) {
+  TupleCell cell;
+  if(ast_expr == nullptr) {
+    return cell_from_float(0);
+  }
+  switch (ast_expr->expr_type)
+  {
+  case AstExprType::VALUE_EXPR: {
+    auto &value = ast_expr->value;
+    cell.set_data((char *)value.data);
+    cell.set_type(value.type);
+    if (value.data != nullptr && value.type == CHARS) {
+      cell.set_length(strlen((const char *)value.data));
+    }
+  } break;
+  case AstExprType::ATTR_EXPR: {
+    RC rc = tuple.find_cell(ast_expr->field, cell);
+    if (rc != RC::SUCCESS) {
+      LOG_PANIC("failed to get attr");
+    }
+  } break;
+  case AstExprType::AGG_EXPR:
+    // TODO: ???
+    break;
+  default: {
+    TupleCell left_cell = calculate(ast_expr->left, tuple);
+    TupleCell right_cell = calculate(ast_expr->right, tuple);
+    if (left_cell.check_null() || right_cell.check_null()) {
+      return null_cell();
+    }
+    float l_val = cell2float(left_cell);
+    float r_val = cell2float(right_cell);
+    switch (ast_expr->expr_type)
+    {
+    case AstExprType::ADD_OP:
+      cell = cell_from_float(l_val + r_val);
+      break;
+    case AstExprType::SUB_OP:
+      cell = cell_from_float(l_val - r_val);
+      break;
+    case AstExprType::MUL_OP:
+      cell = cell_from_float(l_val * r_val);
+      break;
+    case AstExprType::DIV_OP:
+      if (r_val == 0) {
+        return null_cell();
+      }
+      cell = cell_from_float(l_val / r_val);
+      break;
+    }
+  } break;
+  }
+  return cell;
+}
+
+RC AstExpression::get_value(const Tuple &tuple, TupleCell &cell) const {
+  cell = calculate(this, tuple);
+  LOG_INFO("ast expr[%s] call result: %f", this->alias.c_str(), cell2float(cell));
+  return RC::SUCCESS;
+}
