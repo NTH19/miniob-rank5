@@ -48,11 +48,11 @@ public:
   std::vector<std::pair<Field,int>>   order_fields;
   std::vector<AstExpression *> ast_exprs_;
   int is_da=0;
+  std::vector<std::pair<DescribeFun,Field>> funs_;
 
 private:
   std::vector<Field> query_fields_;
   std::vector<Table *> tables_;
-  std::vector<std::pair<DescribeFun,Field>> funs_;
   FilterStmt *filter_stmt_ = nullptr;
 };
 

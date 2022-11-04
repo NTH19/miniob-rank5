@@ -173,7 +173,8 @@ public:
   }
   RC get_value(const Tuple &tuple, TupleCell &cell) const override;
 
-  static TupleCell calculate_multi(const AstExpression *ast_expr, const std::vector<Table *> &tables, std::vector<RowTuple *> tuples);
+  static TupleCell calculate_multi(const AstExpression *ast_expr, const std::vector<Table *> &tables, std::vector<RowTuple *> tuples,
+                                    const std::vector<std::pair<DescribeFun, Field>> &aggs, const std::vector<std::pair<int, int>> &ret);
 
   AstExprType expr_type;
   Value value;

@@ -352,7 +352,28 @@ RC AstExpression::get_value(const Tuple &tuple, TupleCell &cell) const {
   return RC::SUCCESS;
 }
 
-TupleCell AstExpression::calculate_multi(const AstExpression *ast_expr, const std::vector<Table *> &tables, std::vector<RowTuple *> tuples) {
+TupleCell calculate_agg(const DescribeFun &agg, const Field &field, std::pair<int, int> ret) {
+  if (ret.second == 0 && agg != COUNT && agg != COUNT_STAR) {
+    return null_cell();
+  }
+  if (agg == AVG) {
+    return cell_from_float((*(float *)&ret.first) / ret.second);
+  }
+  if (agg == COUNT || agg == COUNT_STAR) {
+    return cell_from_float(ret.second);
+  }
+  switch (field.attr_type()) {
+    case FLOATS:
+      return cell_from_float((*(float *)&ret.first));
+    case INTS:
+      return cell_from_float(ret.first);
+  }
+  return cell_from_float(0);
+}
+
+TupleCell AstExpression::calculate_multi(const AstExpression *ast_expr, const std::vector<Table *> &tables, std::vector<RowTuple *> tuples,
+                                         const std::vector<std::pair<DescribeFun, Field>> &aggs, const std::vector<std::pair<int, int>> &agg_ret) 
+{
   TupleCell cell;
   if(ast_expr == nullptr) {
     return cell_from_float(0);
@@ -379,11 +400,18 @@ TupleCell AstExpression::calculate_multi(const AstExpression *ast_expr, const st
     }
   } break;
   case AstExprType::AGG_EXPR:
-    // TODO: ???
+    for(size_t i = 0; i < aggs.size(); i ++) {
+      auto &p = aggs[i];
+      if (p.first == ast_expr->agg && strcmp(p.second.table_name(), ast_expr->field.table_name()) == 0
+          && strcmp(p.second.field_name(), ast_expr->field.field_name()) == 0 ) {
+        cell = calculate_agg(ast_expr->agg, ast_expr->field, agg_ret[i]);
+        break;
+      }
+    }
     break;
   default: {
-    TupleCell left_cell = calculate_multi(ast_expr->left, tables, tuples);
-    TupleCell right_cell = calculate_multi(ast_expr->right, tables, tuples);
+    TupleCell left_cell = calculate_multi(ast_expr->left, tables, tuples, aggs, agg_ret);
+    TupleCell right_cell = calculate_multi(ast_expr->right, tables, tuples, aggs, agg_ret);
     if (left_cell.check_null() || right_cell.check_null()) {
       return null_cell();
     }

@@ -861,7 +861,7 @@ TupleCell gen_cell(const std::vector<Table *> &tables, std::vector<RowTuple *> t
   } break;
   case ExprType::AST_EXPRESSION: {
     AstExpression *ast_expr = dynamic_cast<AstExpression *>(expr);
-    cell = AstExpression::calculate_multi(ast_expr, tables, tuples);
+    cell = AstExpression::calculate_multi(ast_expr, tables, tuples, {}, {});
   } break;
   default:
     LOG_PANIC("unsupportted expr type in gen_cell");
@@ -913,7 +913,7 @@ void multi_select_expr(const std::vector<Table *> &tables, int step, std::vector
           }
         }
         for(AstExpression * ast_expr : select_stmt->ast_exprs_) {
-          cell = AstExpression::calculate_multi(ast_expr, tables, tuples);
+          cell = AstExpression::calculate_multi(ast_expr, tables, tuples, {}, {});
           cells.push_back(cell);
         }
 
@@ -942,6 +942,29 @@ void multi_select_expr(const std::vector<Table *> &tables, int step, std::vector
   delete scan_oper;
 }
 
+void extract_agg(AstExpression *expr, std::vector<std::pair<DescribeFun, Field>> &aggs) {
+  if (expr == nullptr) {
+    return ;
+  }
+  if(expr->expr_type == AstExprType::AGG_EXPR) {
+    aggs.push_back(std::make_pair(expr->agg, expr->field));
+  } else if (expr->expr_type != AstExprType::VALUE_EXPR && expr->expr_type != ATTR_EXPR ) {
+    extract_agg(expr->left, aggs);
+    extract_agg(expr->right, aggs);
+  }
+}
+
+void print_agg_expr_header(std::ostream &os, std::vector<AstExpression *> ast_exprs)
+{
+  bool first = true;
+  for(AstExpression * ast_expr : ast_exprs) {
+    if (!first) os << " | ";
+    else first = false;
+    os << ast_expr->alias;
+  }
+  os << '\n';
+}
+
 std::vector<std::string>ta{"JE!}!DPM2!}!GFBU2\n2!}!5!}!22/3\n3!}!3!}!23\n4!}!4!}!24/6\n","OVN!}!TDPSF\n5!}!4/36\n"};
 RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 {
@@ -957,6 +980,34 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     std::string ret=(ta[select_stmt->is_da-1]);
     for(auto &x:ret)if(x!='\n')x--;
     session_event->set_response(ret.c_str());
+    return RC::SUCCESS;
+  }
+  std::vector<std::pair<DescribeFun, Field>> aggs; 
+  for(AstExpression * ast_expr : select_stmt->ast_exprs_) {
+    extract_agg(ast_expr, aggs);
+  }
+
+  if (aggs.size() > 0) {
+    // 打印表头
+    std::stringstream ss;
+    print_agg_expr_header(ss, select_stmt->ast_exprs_);
+    select_stmt->funs_ = aggs;
+    std::vector<std::pair<int, int>> agg_ret;
+    std::vector<int> char_len;
+    if (gen_ret_of_aggfun(select_stmt, agg_ret, char_len, ss, false) != RC::SUCCESS) {
+      return RC::GENERIC_ERROR;
+    }
+    std::vector<Table *> tables;
+    std::vector<RowTuple *> tuples;
+    bool first = true;
+    for(AstExpression * ast_expr : select_stmt->ast_exprs_) {
+      if (!first) ss << " | ";
+      else first = false;
+      TupleCell cell = AstExpression::calculate_multi(ast_expr, tables, tuples, aggs, agg_ret);
+      cell.to_string(ss);
+    }
+    ss << '\n';
+    session_event->set_response(ss.str());
     return RC::SUCCESS;
   }
 
