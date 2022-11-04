@@ -836,6 +836,112 @@ RC gen_ret_of_aggfun(
     order_field_=order_field;
     order_=order;
   }
+
+
+
+TupleCell gen_cell(const std::vector<Table *> &tables, std::vector<RowTuple *> tuples, Expression *expr) {
+  TupleCell cell;
+  switch (expr->type())
+  {
+  case ExprType::FIELD: {
+    FieldExpr *filed_expr = dynamic_cast<FieldExpr *>(expr);
+    for(size_t i = 0; i < tables.size(); i ++) {
+      if (strcmp(tables[i]->name(), filed_expr->table_name()) == 0) {
+        RC rc = tuples[i]->find_cell(filed_expr->field(), cell);
+        if(rc != RC::SUCCESS) {
+          LOG_PANIC("failed to find cell in gen_cell");
+        }
+        break;
+      }
+    }
+  } break;
+  case ExprType::VALUE: {
+    ValueExpr *value_expr = dynamic_cast<ValueExpr *>(expr);
+    value_expr->get_tuple_cell(cell);
+  } break;
+  case ExprType::AST_EXPRESSION: {
+    AstExpression *ast_expr = dynamic_cast<AstExpression *>(expr);
+    cell = AstExpression::calculate_multi(ast_expr, tables, tuples);
+  } break;
+  default:
+    LOG_PANIC("unsupportted expr type in gen_cell");
+    break;
+  }
+  return cell;
+}
+
+void multi_select_expr(const std::vector<Table *> &tables, int step, std::vector<RowTuple *> &tuples, std::string &ret, SelectStmt *select_stmt) {
+  auto scan_oper = new TableScanOperator(tables[step]);
+  scan_oper->open();
+  while (scan_oper->next() == RC::SUCCESS) {
+    RowTuple *tuple = dynamic_cast<RowTuple *>(scan_oper->current_tuple());
+    if (nullptr == tuple) {
+      LOG_ERROR("DFS empty\n!!!!!");
+      break;
+    }
+    tuples.push_back(tuple);
+    if (step != tables.size() - 1) {
+      multi_select_expr(tables, step + 1, tuples, ret, select_stmt);
+    } else {
+      // 使用condition判断tuple是否符合条件
+      FilterStmt* filter = select_stmt->filter_stmt();
+      const std::vector<FilterUnit *> &filter_units = filter->filter_units();
+      bool ok = true;
+      for(const FilterUnit *f_unit : filter_units) {
+        TupleCell left_cell = gen_cell(tables, tuples, f_unit->left());
+        TupleCell right_cell = gen_cell(tables, tuples, f_unit->right());
+        if (!gen_compare_res(left_cell, right_cell, f_unit->comp())) {
+          ok = false;
+          break;
+        }
+      }
+
+      // 根据project计算结果
+      if (ok) {
+        std::vector<TupleCell> cells;
+        TupleCell cell;
+        for (const Field &field : select_stmt->query_fields()) {
+          for(size_t i = 0; i < tables.size(); i ++) {
+            if (strcmp(tables[i]->name(), field.table_name()) == 0) {
+              RC rc = tuples[i]->find_cell(field, cell);
+              if(rc != RC::SUCCESS) {
+                LOG_PANIC("failed to find cell in multi_select_expr");
+              }
+              cells.push_back(cell);
+              break;
+            }
+          }
+        }
+        for(AstExpression * ast_expr : select_stmt->ast_exprs_) {
+          cell = AstExpression::calculate_multi(ast_expr, tables, tuples);
+          cells.push_back(cell);
+        }
+
+        bool first_field = true;
+        std::stringstream ss;
+        for(auto &cell : cells) {
+          if (!first_field) {
+            ss << " | ";
+          } else {
+            first_field = false;
+          }
+          if(cell.check_null()) {
+            ss << "NULL";
+          } else {
+            cell.to_string(ss);
+          }
+        }
+        ss << '\n';
+        ret += ss.str();
+      }
+    }
+    tuples.pop_back();
+  }
+
+  scan_oper->close();
+  delete scan_oper;
+}
+
 std::vector<std::string>ta{"JE!}!DPM2!}!GFBU2\n2!}!5!}!22/3\n3!}!3!}!23\n4!}!4!}!24/6\n","OVN!}!TDPSF\n5!}!4/36\n"};
 RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 {
@@ -853,6 +959,25 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     session_event->set_response(ret.c_str());
     return RC::SUCCESS;
   }
+
+  if (select_stmt->tables().size() > 1 && select_stmt->ast_exprs_.size() > 0) {
+    // 打印表头
+    ProjectOperator project_oper;
+    for (const Field &field : select_stmt->query_fields()) {
+      project_oper.add_projection(field.table(), field.meta(), true, alias_set);
+    }
+    for(AstExpression * ast_expr : select_stmt->ast_exprs_) {
+      project_oper.add_expr_projection(ast_expr);
+    }
+    std::stringstream ss;
+    print_tuple_header(ss, project_oper);
+    std::string ret_str;
+    std::vector<RowTuple *> tuples;
+    multi_select_expr(select_stmt->tables(), 0, tuples, ret_str, select_stmt);
+    session_event->set_response(ss.str() + ret_str);
+    return RC::SUCCESS;
+  }
+
   // select mutiple tables happens here
   if (select_stmt->tables().size() > 1) {
     auto tables = select_stmt->tables();

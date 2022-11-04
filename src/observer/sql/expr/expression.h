@@ -15,9 +15,11 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 //#include "tuple.h"
 #include <string.h>
+#include <vector>
 #include "storage/common/field.h"
 #include "sql/expr/tuple_cell.h"
 class Tuple;
+class RowTuple;
 
 enum class ExprType {
   NONE,
@@ -170,6 +172,8 @@ public:
     return ExprType::AST_EXPRESSION;
   }
   RC get_value(const Tuple &tuple, TupleCell &cell) const override;
+
+  static TupleCell calculate_multi(const AstExpression *ast_expr, const std::vector<Table *> &tables, std::vector<RowTuple *> tuples);
 
   AstExprType expr_type;
   Value value;
