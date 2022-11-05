@@ -8,7 +8,6 @@ struct ParserContext;
 #include "yacc_sql.tab.h"
 extern int atoi();
 extern double atof();
-#define YYDEBUG   1
 #if YYDEBUG > 0
 #define debug_printf  printf
 #else
@@ -38,9 +37,11 @@ DOUBLE_QUOTE     [\"]
 {WHITE_SAPCE}                                        // ignore whitespace
 \n                                                   ;
 
+
 {DIGIT}+                                             yylval->number=atoi(yytext); RETURN_TOKEN(NUMBER);
 {DIGIT}+{DOT}{DIGIT}+                                yylval->floats=(float)(atof(yytext)); RETURN_TOKEN(FLOAT);
-"select * from csq_1 where (select max(csq_2.feat2) from csq_2) > feat1 or (select min(csq_3.col3) from csq_3) < col1;" RETURN_TOKEN(DABIAO);
+
+
 ";"                                                  RETURN_TOKEN(SEMICOLON);
 {DOT}                                                RETURN_TOKEN(DOT);
 "*"                                                  RETURN_TOKEN(STAR);
@@ -54,6 +55,8 @@ DOUBLE_QUOTE     [\"]
 [Ii][Nn][Dd][Ee][Xx]                                 RETURN_TOKEN(INDEX);
 [Oo][Nn]                                             RETURN_TOKEN(ON);
 [Ss][Hh][Oo][Ww]                                     RETURN_TOKEN(SHOW);
+[Gg][Rr][Oo][Uu][Pp]                                 RETURN_TOKEN(GROUP);
+[Bb][Yy]                                             RETURN_TOKEN(BY);
 [Ss][Yy][Nn][Cc]                                     RETURN_TOKEN(SYNC);
 [Ss][Ee][Ll][Ee][Cc][Tt]                             RETURN_TOKEN(SELECT);
 [Ff][Rr][Oo][Mm]                                     RETURN_TOKEN(FROM);
@@ -71,6 +74,7 @@ DOUBLE_QUOTE     [\"]
 [Rr][Oo][Ll][Ll][Bb][Aa][Cc][Kk]                     RETURN_TOKEN(TRX_ROLLBACK);
 [Ee][Xx][Ii][Ss][Tt][Ss]                             RETURN_TOKEN(EXIST_T);
 [Ii][Nn]                                             RETURN_TOKEN(IN_T);
+[Oo][Rr]                                             RETURN_TOKEN(OR);
 [Ii][Nn][Tt]                                         RETURN_TOKEN(INT_T);
 [Cc][Hh][Aa][Rr]                                     RETURN_TOKEN(STRING_T);
 [Ff][Ll][Oo][Aa][Tt]                                 RETURN_TOKEN(FLOAT_T);
@@ -90,10 +94,10 @@ DOUBLE_QUOTE     [\"]
 [Ll][Ii][Kk][Ee]                                     RETURN_TOKEN(LIKE);
 [Ii][Ss]								                             RETURN_TOKEN(IS);
 [Nn][Uu][Ll][Ll]						                         RETURN_TOKEN(NULLL);
+[Hh][Aa][Vv][Ii][Nn][Gg]                             RETURN_TOKEN(HAVING);
 [Nn][Uu][Ll][Ll][Aa][Bb][Ll][Ee]		                 RETURN_TOKEN(NULLABLE);
 [Uu][Nn][Ii][Qq][Uu][Ee]                             RETURN_TOKEN(UNIQUE);
 [Oo][Rr][Dd][Ee][Rr]                                 RETURN_TOKEN(ORDER);
-[Bb][Yy]                                             RETURN_TOKEN(BY);
 [Aa][Ss][Cc]                                         RETURN_TOKEN(ASC);
 {ID}                                                 yylval->string=strdup(yytext); RETURN_TOKEN(ID);
 "("                                                  RETURN_TOKEN(LBRACE);

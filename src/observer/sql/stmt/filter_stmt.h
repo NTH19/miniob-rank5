@@ -92,7 +92,8 @@ public:
       const Condition &condition, FilterUnit *&filter_unit,std::map<std::string, std::queue<std::string>> *alias_name_map = nullptr, bool out = false);
 
   std::map<std::string, std::queue<std::string>> *alias_name_map;
-
+  bool is_or=false;
 private:
   std::vector<FilterUnit *> filter_units_;  // 默认当前都是AND关系
+  
 };

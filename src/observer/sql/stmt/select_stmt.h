@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include <vector>
+#include<map>
 
 #include "rc.h"
 #include "sql/stmt/stmt.h"
@@ -26,6 +27,19 @@ class FieldMeta;
 class FilterStmt;
 class Db;
 class Table;
+
+struct Group_by{
+  std::map<int,Group_by*>zhu;
+  std::vector<std::pair<int,int>>ret;
+  std::vector<int>char_len;
+  std::string ans;
+};
+//假设要么agg在select 中出现要么是count
+struct hav_con{
+  CompOp op;
+  bool is_count;
+  int num;
+};
 
 class SelectStmt : public Stmt
 {
@@ -44,15 +58,20 @@ public:
   FilterStmt *filter_stmt() const { return filter_stmt_; }
   const std::vector<std::pair<DescribeFun,Field>> & funs()const {return funs_;}
   int need_reverse;
+
+  int flag_=0;
+  int group_num=0;
+  Group_by* head=nullptr;
+
   std::map<std::string,std::queue<std::string>> aliasset_;
   std::vector<std::pair<Field,int>>   order_fields;
   std::vector<AstExpression *> ast_exprs_;
-  int is_da=0;
   std::vector<std::pair<DescribeFun,Field>> funs_;
-
+  hav_con* hav=nullptr;
 private:
   std::vector<Field> query_fields_;
   std::vector<Table *> tables_;
   FilterStmt *filter_stmt_ = nullptr;
+
 };
 

@@ -335,7 +335,11 @@ void selects_append_conditions(Selects *selects, Condition conditions[], size_t 
   }
   selects->condition_num = condition_num;
 }
-
+void selects_setup_having_condition(Selects *selects, Condition conditions[])
+{
+  selects->hav_con[0]=conditions[0];
+  selects->ha_num=1;
+}
 void selects_append_conditions_start(Selects *selects, Condition conditions[], size_t start,size_t end)
 {
   assert(end-start <= sizeof(selects->conditions) / sizeof(selects->conditions[0]));

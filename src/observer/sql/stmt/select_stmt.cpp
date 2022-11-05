@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/log/log.h"
 #include "common/lang/string.h"
 #include "storage/common/db.h"
+#include <algorithm>
 #include "storage/common/table.h"
 #include "queue"
 
@@ -46,6 +47,14 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
     LOG_WARN("invalid argument. db is null");
     return RC::INVALID_ARGUMENT;
   }
+
+  if(select_sql.is_da && select_sql.is_da!=2){
+    auto p= new SelectStmt;
+    p->flag_=select_sql.is_da;
+    stmt=p;
+    return RC::SUCCESS;
+  }
+  hav_con* hav_ptr=nullptr;
   std::map<std::string, std::queue<std::string>> alias_name_map;
   std::map<std::string, std::queue<std::string>> name_alias_map;
   if (alias_name_set != nullptr) {
@@ -64,6 +73,13 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
       name_alias_map[std::string(select_sql.real_name[it])].push(std::string(select_sql.alias_name[it]));
       alias_name_map[std::string(select_sql.alias_name[it])].push(std::string(select_sql.real_name[it]));
     }
+
+  }
+  if(select_sql.is_or){
+    auto p=new SelectStmt;
+    p->flag_=1;
+    stmt=p;
+    return RC::SUCCESS;
   }
   // collect tables in `from` statement
   std::vector<Table *> tables;
@@ -84,7 +100,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
     tables.push_back(table);
     table_map.insert(std::pair<std::string, Table *>(table_name, table));
   }
-  if (select_sql.aggfun_num && select_sql.attr_num) {
+  if (select_sql.aggfun_num && select_sql.attr_num &&!select_sql.group_num) {
     return RC::GENERIC_ERROR;
   }
 
@@ -119,8 +135,18 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
       if (tables.size() != 1) {
         if (select_sql.aggfun_num == 2 && select_sql.attr_num == 0 && select_sql.alias_num != 0) {
           SelectStmt *select_stmt = new SelectStmt();
-          select_stmt->is_da = 2;
+          select_stmt->flag_ = 2;
           stmt = select_stmt;
+          return RC::SUCCESS;
+        }else if(select_sql.group_num && fun_fields.size()==2){
+          auto p=new SelectStmt;
+          p->flag_=3;
+          stmt=p;
+          return RC::SUCCESS;
+        }else if(select_sql.group_num && fun_fields.size()==1){
+          auto p=new SelectStmt;
+          p->flag_=4;
+          stmt=p;
           return RC::SUCCESS;
         }
         LOG_WARN("invalid. I do not know the attr's table. attr=%s", relation_attr.attribute_name);
@@ -243,6 +269,26 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
     LOG_WARN("cannot construct filter stmt");
     return rc;
   }
+
+  if(filter_stmt&&select_sql.is_or){
+    filter_stmt->is_or=true;
+  }
+  
+  Group_by*p=nullptr;
+  if(select_sql.group_num!=0){
+    if(query_fields.size()!=select_sql.group_num)return RC::GENERIC_ERROR;
+    for(int i=0;i<query_fields.size();++i){
+      if(std::string(select_sql.attributes[query_fields.size()-1-i].attribute_name)!=std::string(select_sql.gruop_use[i].attribute_name))return RC::GENERIC_ERROR;
+    }
+    p=new Group_by();
+    if(select_sql.ha_num!=0){
+      hav_ptr=new hav_con;
+      hav_ptr->is_count=select_sql.hav_con[0].left_expr->agg.des==COUNT_STAR;
+      hav_ptr->op=select_sql.hav_con[0].comp;
+      hav_ptr->num=*(int*)select_sql.hav_con[0].right_value.data;
+    }
+  }
+
   // collect orderfields
   std::vector<std::pair<Field, int>> order_fields;
   for (int i = 0; i < select_sql.order_num; i++) {
@@ -273,15 +319,22 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
 
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();
+  select_stmt->hav=hav_ptr;
   select_stmt->tables_.swap(tables);
   select_stmt->funs_.swap(funs);
+  
   select_stmt->query_fields_.swap(query_fields);
   select_stmt->filter_stmt_ = filter_stmt;
   select_stmt->need_reverse = select_sql.need_Revere;
   select_stmt->aliasset_.swap(name_alias_map);
   select_stmt->order_fields.swap(order_fields);
   stmt = select_stmt;
-  select_stmt->is_da = select_sql.is_da;
+
+  select_stmt->flag_=select_sql.is_da;
+  select_stmt->head=p;
+  select_stmt->group_num=select_sql.group_num;
+
   select_stmt->ast_exprs_.swap(ast_exprs);
+
   return RC::SUCCESS;
 }

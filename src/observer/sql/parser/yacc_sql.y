@@ -93,7 +93,6 @@ ParserContext *get_context(yyscan_t scanner)
 		AVG_T
 		SUM_T
         TRX_COMMIT
-		DABIAO
         TRX_ROLLBACK
         INT_T
         STRING_T
@@ -110,7 +109,8 @@ ParserContext *get_context(yyscan_t scanner)
 		AS
         AND
         SET
-
+		OR
+		GROUP
         ON
 		INNER_T
 		JOIN_T
@@ -131,6 +131,7 @@ ParserContext *get_context(yyscan_t scanner)
 		NULLL
 		NULLABLE
 		UNIQUE
+		HAVING
 		ORDER
         BY
 		ADD
@@ -580,22 +581,17 @@ update_agg:
 	}
 	;
 
-
+having:
+	|HAVING expr comOp expr 
+	{
+		Condition condition;
+		condition_init_from_expr(&condition, CONTEXT->comp, $2, $4);
+		selects_setup_having_condition(&CONTEXT->ssql->sstr.selection,&condition);
+	}; 
 select:
-	DABIAO{
-
-		selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
-		CONTEXT->ssql->flag=SCF_SELECT;//"select";
-		
-  		CONTEXT->condition_length = 0;
-  		CONTEXT->from_length = 0;
-  		CONTEXT->select_length = 0;
-  		CONTEXT->value_length = 0;
-  		CONTEXT->ssql->sstr.selection.is_da=1;
-  		CONTEXT->ssql->sstr.selection.sub_query_num=0;
-	}
+	
 	/*  select 语句的语法解析树*/
-    |SELECT select_attr FROM ID rel_list where order_by SEMICOLON{
+    SELECT select_attr FROM ID rel_list where  SEMICOLON{
 			selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
 
 			selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
@@ -607,7 +603,19 @@ select:
 			CONTEXT->from_length=0;
 			CONTEXT->select_length=0;
 			CONTEXT->value_length = 0;
-		}
+	}
+
+	| SELECT select_attr  FROM ID rel_list where GROUP BY by_attrs having SEMICOLON{
+		selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
+		selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
+		CONTEXT->ssql->flag=SCF_SELECT;
+
+		CONTEXT->condition_length=0;
+		CONTEXT->from_length=0;
+		CONTEXT->select_length=0;
+		CONTEXT->value_length = 0;
+	}
+
 	|SELECT select_attr FROM ID INNER_T JOIN_T ID ON join_cons join_list where SEMICOLON{
 			selects_append_relation(&CONTEXT->ssql->sstr.selection, $7);
 			selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
@@ -640,41 +648,29 @@ select:
 		CONTEXT->value_length = 0;
 	}
 	;
-order_by:
-
-	| ORDER BY order_item order_item_list
-	;
-
-order_item: 
-	ID order {
+by_attrs:
+	ID {
 		RelAttr attr;
 		relation_attr_init(&attr, NULL, $1);
-		selects_append_order(&CONTEXT->ssql->sstr.selection, &attr, CONTEXT->order);
+		CONTEXT->ssql->sstr.selection.gruop_use[0]=attr;
+		CONTEXT->ssql->sstr.selection.group_num=1;
 	}
-	| ID DOT ID order {
-		RelAttr attr;
-		relation_attr_init(&attr, $1, $3);
-		selects_append_order(&CONTEXT->ssql->sstr.selection, &attr, CONTEXT->order);
+	|ID COMMA ID{
+		RelAttr attr1,attr2;
+		relation_attr_init(&attr1, NULL, $1);
+		relation_attr_init(&attr2, NULL, $3);
+		CONTEXT->ssql->sstr.selection.gruop_use[0]=attr1;
+		CONTEXT->ssql->sstr.selection.gruop_use[1]=attr2;
+		CONTEXT->ssql->sstr.selection.group_num=2;
 	}
-	;
-
-order:
-	/* empty */ {
-		CONTEXT->order = 0;
-	}
-	| ASC {
-		CONTEXT->order = 0;
-	}
-	| DESC {
-		CONTEXT->order = 1;
-	}
-	;
-
-order_item_list:
-	/* empty */
-	| COMMA order_item order_item_list
-	
-	;
+	|ID DOT ID COMMA ID DOT ID {
+		RelAttr attr1,attr2;
+		relation_attr_init(&attr1,$1,$3);
+		relation_attr_init(&attr2,$5,$7);
+		CONTEXT->ssql->sstr.selection.gruop_use[0]=attr1;
+		CONTEXT->ssql->sstr.selection.gruop_use[1]=attr2;
+		CONTEXT->ssql->sstr.selection.group_num=2;
+	};
 
 
 sub_query:
@@ -2419,6 +2415,8 @@ attr_list:
 			CONTEXT->ssql->sstr.selection.need_Revere=0;
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
   	  }
+
+
 	| COMMA ID AS ID attr_list{
 		RelAttr attr;
 		relation_attr_init(&attr, NULL, $2);
@@ -2445,6 +2443,7 @@ attr_list:
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
 			selects_append_alias2(&CONTEXT->ssql->sstr.selection, $2,$4,$5);
 		}
+
   	;
 
 rel_list:
@@ -2469,7 +2468,11 @@ where:
 condition_list:
     /* empty */
     | AND condition condition_list {
-			}
+		CONTEXT->ssql->sstr.selection.is_or=0;
+	}
+	|OR condition condition_list{
+		CONTEXT->ssql->sstr.selection.is_or=1;
+	}
     ;
 condition:
     expr comOp expr 
