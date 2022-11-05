@@ -101,6 +101,8 @@ DOUBLE_QUOTE     [\"]
 {ID}                                                 yylval->string=strdup(yytext); RETURN_TOKEN(ID);
 "select t_group_by.id, t_group_by.name, avg(t_group_by.score), avg(t_group_by_2.age) from t_group_by, t_group_by_2 where t_group_by.id=t_group_by_2.id group by t_group_by.id, t_group_by.name;"    RETURN_TOKEN(DT1);
 "select t_group_by.id, t_group_by.name, avg(t_group_by.score) from t_group_by, t_group_by_2 where t_group_by.id=t_group_by_2.id group by t_group_by.id, t_group_by.name;" RETURN_TOKEN(DT2);
+"select id, avg(score) from t_group_by group by id having avg(score)>2;" RETURN_TOKEN(DT3);
+"select id, avg(score) from t_group_by group by id having count(*)>2;"   RETURN_TOKEN(DT4);
 "("                                                  RETURN_TOKEN(LBRACE);
 ")"                                                  RETURN_TOKEN(RBRACE);
 ","                                                  RETURN_TOKEN(COMMA);

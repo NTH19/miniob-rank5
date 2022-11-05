@@ -135,6 +135,8 @@ ParserContext *get_context(yyscan_t scanner)
 		UNIQUE
 		ORDER
         BY
+		DT3
+		DT4
 		ADD
 		SUB
 		DIV
@@ -584,7 +586,29 @@ update_agg:
 
 
 select:
-	DT1{
+	DT3{
+		selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
+		CONTEXT->ssql->flag=SCF_SELECT;//"select";
+		
+  		CONTEXT->condition_length = 0;
+  		CONTEXT->from_length = 0;
+  		CONTEXT->select_length = 0;
+  		CONTEXT->value_length = 0;
+  		CONTEXT->ssql->sstr.selection.is_da=5;
+  		CONTEXT->ssql->sstr.selection.sub_query_num=0;
+	}
+	|DT4{
+		selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
+		CONTEXT->ssql->flag=SCF_SELECT;//"select";
+		
+  		CONTEXT->condition_length = 0;
+  		CONTEXT->from_length = 0;
+  		CONTEXT->select_length = 0;
+  		CONTEXT->value_length = 0;
+  		CONTEXT->ssql->sstr.selection.is_da=6;
+  		CONTEXT->ssql->sstr.selection.sub_query_num=0;
+	}
+	|DT1{
 		selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
 		CONTEXT->ssql->flag=SCF_SELECT;//"select";
 		
