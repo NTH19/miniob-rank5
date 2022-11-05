@@ -102,6 +102,14 @@ void ProjectOperator::add_projection(
   tuple_.add_cell_spec(spec);
 }
 
+
+
+void ProjectOperator::add_expr_projection(AstExpression *ast_expr) {
+  TupleCellSpec *spec = new TupleCellSpec(ast_expr);
+  spec->set_alias(ast_expr->alias.c_str());
+  tuple_.add_cell_spec(spec);
+}
+
 RC ProjectOperator::tuple_cell_spec_at(int index, const TupleCellSpec *&spec) const
 {
   return tuple_.cell_spec_at(index, spec);

@@ -26,7 +26,7 @@ public:
   virtual ~ProjectOperator() = default;
 
   void add_projection(const Table *table, const FieldMeta *field,bool add_table,std::map<std::string,std::queue<std::string>> &);
-
+  void add_expr_projection(AstExpression *ast_expr);
   RC open() override;
   RC next() override;
   RC close() override;

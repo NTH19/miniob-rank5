@@ -15,7 +15,18 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include <string>
+#include <unordered_map>
+#include "sql/parser/parse_defs.h"
+#include "sql/stmt/stmt.h"
+#include "sql/expr/expression.h"
+#include "common/log/log.h"
+#include "storage/common/db.h"
+#include "storage/common/table.h"
 
 std::string double2string(double v);
 
 std::string charptr2string(char *s, int length);
+
+RC valid_expr(const AstExpr *expr, Table *default_table, std::unordered_map<std::string, Table *> *tables);
+AstExpression *create_expr(const AstExpr *expr, Table *default_table, std::unordered_map<std::string, Table *> *tables);
+void expr2string(AstExpr *expr, std::string *str);

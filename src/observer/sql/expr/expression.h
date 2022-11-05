@@ -15,9 +15,11 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 //#include "tuple.h"
 #include <string.h>
+#include <vector>
 #include "storage/common/field.h"
 #include "sql/expr/tuple_cell.h"
 class Tuple;
+class RowTuple;
 
 enum class ExprType {
   NONE,
@@ -27,7 +29,8 @@ enum class ExprType {
   NOT_INEXPR,
   EXIST,
   NORMAL,
-  NOT_EXIST
+  NOT_EXIST,
+  AST_EXPRESSION,
 };
 class SelectStmt;
 class Expression
@@ -160,4 +163,28 @@ public:
   RC get_value(const Tuple &tuple, TupleCell &cell) const override{return RC::SUCCESS;};
   SelectStmt* ptr=nullptr;
   CompOp cmp;
+};
+
+class AstExpression : public Expression {
+public:
+  virtual ~AstExpression() = default;
+  ExprType type() const override {
+    return ExprType::AST_EXPRESSION;
+  }
+  RC get_value(const Tuple &tuple, TupleCell &cell) const override;
+
+  static TupleCell calculate_multi(const AstExpression *ast_expr, const std::vector<Table *> &tables, std::vector<RowTuple *> tuples,
+                                    const std::vector<std::pair<DescribeFun, Field>> &aggs, const std::vector<std::pair<int, int>> &ret);
+
+  AstExprType expr_type;
+  Value value;
+  Field field;
+  DescribeFun agg;
+  // 左右括号的数量
+  int left_brackets;
+  int right_brackets;
+  AstExpression *left;
+  AstExpression *right;
+  // 表达式的字符串，用于表头的输出
+  std::string alias;
 };
