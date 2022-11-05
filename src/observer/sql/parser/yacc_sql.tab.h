@@ -65,73 +65,71 @@ extern int yydebug;
     ASC = 266,                     /* ASC  */
     SHOW = 267,                    /* SHOW  */
     SYNC = 268,                    /* SYNC  */
-    DT2 = 269,                     /* DT2  */
-    INSERT = 270,                  /* INSERT  */
-    DELETE = 271,                  /* DELETE  */
-    UPDATE = 272,                  /* UPDATE  */
-    LBRACE = 273,                  /* LBRACE  */
-    RBRACE = 274,                  /* RBRACE  */
-    COMMA = 275,                   /* COMMA  */
-    TRX_BEGIN = 276,               /* TRX_BEGIN  */
-    COUNT_T = 277,                 /* COUNT_T  */
-    MAX_T = 278,                   /* MAX_T  */
-    MIN_T = 279,                   /* MIN_T  */
-    AVG_T = 280,                   /* AVG_T  */
-    SUM_T = 281,                   /* SUM_T  */
-    TRX_COMMIT = 282,              /* TRX_COMMIT  */
-    DT = 283,                      /* DT  */
-    TRX_ROLLBACK = 284,            /* TRX_ROLLBACK  */
-    INT_T = 285,                   /* INT_T  */
-    STRING_T = 286,                /* STRING_T  */
-    FLOAT_T = 287,                 /* FLOAT_T  */
-    DATE_T = 288,                  /* DATE_T  */
-    TEXT_T = 289,                  /* TEXT_T  */
-    HELP = 290,                    /* HELP  */
-    EXIT = 291,                    /* EXIT  */
-    DOT = 292,                     /* DOT  */
-    INTO = 293,                    /* INTO  */
-    VALUES = 294,                  /* VALUES  */
-    FROM = 295,                    /* FROM  */
-    WHERE = 296,                   /* WHERE  */
-    AS = 297,                      /* AS  */
-    AND = 298,                     /* AND  */
-    SET = 299,                     /* SET  */
-    DT1 = 300,                     /* DT1  */
-    GROUP = 301,                   /* GROUP  */
-    ON = 302,                      /* ON  */
-    INNER_T = 303,                 /* INNER_T  */
-    JOIN_T = 304,                  /* JOIN_T  */
-    LOAD = 305,                    /* LOAD  */
-    DATA = 306,                    /* DATA  */
-    INFILE = 307,                  /* INFILE  */
-    EQ = 308,                      /* EQ  */
-    LT = 309,                      /* LT  */
-    GT = 310,                      /* GT  */
-    LE = 311,                      /* LE  */
-    GE = 312,                      /* GE  */
-    NE = 313,                      /* NE  */
-    EXIST_T = 314,                 /* EXIST_T  */
-    IN_T = 315,                    /* IN_T  */
-    LIKE = 316,                    /* LIKE  */
-    NOT = 317,                     /* NOT  */
-    IS = 318,                      /* IS  */
-    NULLL = 319,                   /* NULLL  */
-    NULLABLE = 320,                /* NULLABLE  */
-    UNIQUE = 321,                  /* UNIQUE  */
-    HAVING = 322,                  /* HAVING  */
-    ORDER = 323,                   /* ORDER  */
-    BY = 324,                      /* BY  */
-    ADD = 325,                     /* ADD  */
-    SUB = 326,                     /* SUB  */
-    DIV = 327,                     /* DIV  */
-    NUMBER = 328,                  /* NUMBER  */
-    FLOAT = 329,                   /* FLOAT  */
-    DATEE = 330,                   /* DATEE  */
-    ID = 331,                      /* ID  */
-    PATH = 332,                    /* PATH  */
-    SSS = 333,                     /* SSS  */
-    STAR = 334,                    /* STAR  */
-    STRING_V = 335                 /* STRING_V  */
+    INSERT = 269,                  /* INSERT  */
+    DELETE = 270,                  /* DELETE  */
+    UPDATE = 271,                  /* UPDATE  */
+    LBRACE = 272,                  /* LBRACE  */
+    RBRACE = 273,                  /* RBRACE  */
+    COMMA = 274,                   /* COMMA  */
+    TRX_BEGIN = 275,               /* TRX_BEGIN  */
+    COUNT_T = 276,                 /* COUNT_T  */
+    MAX_T = 277,                   /* MAX_T  */
+    MIN_T = 278,                   /* MIN_T  */
+    AVG_T = 279,                   /* AVG_T  */
+    SUM_T = 280,                   /* SUM_T  */
+    TRX_COMMIT = 281,              /* TRX_COMMIT  */
+    TRX_ROLLBACK = 282,            /* TRX_ROLLBACK  */
+    INT_T = 283,                   /* INT_T  */
+    STRING_T = 284,                /* STRING_T  */
+    FLOAT_T = 285,                 /* FLOAT_T  */
+    DATE_T = 286,                  /* DATE_T  */
+    TEXT_T = 287,                  /* TEXT_T  */
+    HELP = 288,                    /* HELP  */
+    EXIT = 289,                    /* EXIT  */
+    DOT = 290,                     /* DOT  */
+    INTO = 291,                    /* INTO  */
+    VALUES = 292,                  /* VALUES  */
+    FROM = 293,                    /* FROM  */
+    WHERE = 294,                   /* WHERE  */
+    AS = 295,                      /* AS  */
+    AND = 296,                     /* AND  */
+    SET = 297,                     /* SET  */
+    OR = 298,                      /* OR  */
+    GROUP = 299,                   /* GROUP  */
+    ON = 300,                      /* ON  */
+    INNER_T = 301,                 /* INNER_T  */
+    JOIN_T = 302,                  /* JOIN_T  */
+    LOAD = 303,                    /* LOAD  */
+    DATA = 304,                    /* DATA  */
+    INFILE = 305,                  /* INFILE  */
+    EQ = 306,                      /* EQ  */
+    LT = 307,                      /* LT  */
+    GT = 308,                      /* GT  */
+    LE = 309,                      /* LE  */
+    GE = 310,                      /* GE  */
+    NE = 311,                      /* NE  */
+    EXIST_T = 312,                 /* EXIST_T  */
+    IN_T = 313,                    /* IN_T  */
+    LIKE = 314,                    /* LIKE  */
+    NOT = 315,                     /* NOT  */
+    IS = 316,                      /* IS  */
+    NULLL = 317,                   /* NULLL  */
+    NULLABLE = 318,                /* NULLABLE  */
+    UNIQUE = 319,                  /* UNIQUE  */
+    HAVING = 320,                  /* HAVING  */
+    ORDER = 321,                   /* ORDER  */
+    BY = 322,                      /* BY  */
+    ADD = 323,                     /* ADD  */
+    SUB = 324,                     /* SUB  */
+    DIV = 325,                     /* DIV  */
+    NUMBER = 326,                  /* NUMBER  */
+    FLOAT = 327,                   /* FLOAT  */
+    DATEE = 328,                   /* DATEE  */
+    ID = 329,                      /* ID  */
+    PATH = 330,                    /* PATH  */
+    SSS = 331,                     /* SSS  */
+    STAR = 332,                    /* STAR  */
+    STRING_V = 333                 /* STRING_V  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -140,7 +138,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 143 "yacc_sql.y"
+#line 141 "yacc_sql.y"
 
   struct _Attr *attr;
   struct _Condition *condition1;
@@ -153,7 +151,7 @@ union YYSTYPE
   struct _AstExpr *expr1;
   enum _CompOp compOp1;
 
-#line 157 "yacc_sql.tab.h"
+#line 155 "yacc_sql.tab.h"
 
 };
 typedef union YYSTYPE YYSTYPE;

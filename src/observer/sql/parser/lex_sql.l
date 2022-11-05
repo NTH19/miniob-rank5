@@ -74,8 +74,8 @@ DOUBLE_QUOTE     [\"]
 [Rr][Oo][Ll][Ll][Bb][Aa][Cc][Kk]                     RETURN_TOKEN(TRX_ROLLBACK);
 [Ee][Xx][Ii][Ss][Tt][Ss]                             RETURN_TOKEN(EXIST_T);
 [Ii][Nn]                                             RETURN_TOKEN(IN_T);
+[Oo][Rr]                                             RETURN_TOKEN(OR);
 [Ii][Nn][Tt]                                         RETURN_TOKEN(INT_T);
-"select * from csq_1 where (select max(csq_2.feat2) from csq_2) > feat1 or (select min(csq_3.col3) from csq_3) < col1;" RETURN_TOKEN(DT);
 [Cc][Hh][Aa][Rr]                                     RETURN_TOKEN(STRING_T);
 [Ff][Ll][Oo][Aa][Tt]                                 RETURN_TOKEN(FLOAT_T);
 [Dd][Aa][Tt][Ee]			            	                 RETURN_TOKEN(DATE_T);
@@ -100,8 +100,6 @@ DOUBLE_QUOTE     [\"]
 [Oo][Rr][Dd][Ee][Rr]                                 RETURN_TOKEN(ORDER);
 [Aa][Ss][Cc]                                         RETURN_TOKEN(ASC);
 {ID}                                                 yylval->string=strdup(yytext); RETURN_TOKEN(ID);
-"select t_group_by.id, t_group_by.name, avg(t_group_by.score), avg(t_group_by_2.age) from t_group_by, t_group_by_2 where t_group_by.id=t_group_by_2.id group by t_group_by.id, t_group_by.name;"    RETURN_TOKEN(DT1);
-"select t_group_by.id, t_group_by.name, avg(t_group_by.score) from t_group_by, t_group_by_2 where t_group_by.id=t_group_by_2.id group by t_group_by.id, t_group_by.name;" RETURN_TOKEN(DT2);
 "("                                                  RETURN_TOKEN(LBRACE);
 ")"                                                  RETURN_TOKEN(RBRACE);
 ","                                                  RETURN_TOKEN(COMMA);

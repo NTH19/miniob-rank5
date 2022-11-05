@@ -80,7 +80,6 @@ ParserContext *get_context(yyscan_t scanner)
 		ASC
         SHOW
         SYNC
-		DT2
         INSERT
         DELETE
         UPDATE
@@ -94,7 +93,6 @@ ParserContext *get_context(yyscan_t scanner)
 		AVG_T
 		SUM_T
         TRX_COMMIT
-		DT	
         TRX_ROLLBACK
         INT_T
         STRING_T
@@ -111,7 +109,7 @@ ParserContext *get_context(yyscan_t scanner)
 		AS
         AND
         SET
-		DT1
+		OR
 		GROUP
         ON
 		INNER_T
@@ -591,41 +589,9 @@ having:
 		selects_setup_having_condition(&CONTEXT->ssql->sstr.selection,&condition);
 	}; 
 select:
-	DT1{
-		selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
-		CONTEXT->ssql->flag=SCF_SELECT;//"select";
-		
-  		CONTEXT->condition_length = 0;
-  		CONTEXT->from_length = 0;
-  		CONTEXT->select_length = 0;
-  		CONTEXT->value_length = 0;
-  		CONTEXT->ssql->sstr.selection.is_da=3;
-  		CONTEXT->ssql->sstr.selection.sub_query_num=0;
-	}
-	|DT2{
-		selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
-		CONTEXT->ssql->flag=SCF_SELECT;//"select";
-		
-  		CONTEXT->condition_length = 0;
-  		CONTEXT->from_length = 0;
-  		CONTEXT->select_length = 0;
-  		CONTEXT->value_length = 0;
-  		CONTEXT->ssql->sstr.selection.is_da=4;
-  		CONTEXT->ssql->sstr.selection.sub_query_num=0;
-	}
-	|DT{
-		selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
-		CONTEXT->ssql->flag=SCF_SELECT;//"select";
-		
-  		CONTEXT->condition_length = 0;
-  		CONTEXT->from_length = 0;
-  		CONTEXT->select_length = 0;
-  		CONTEXT->value_length = 0;
-  		CONTEXT->ssql->sstr.selection.is_da=1;
-  		CONTEXT->ssql->sstr.selection.sub_query_num=0;
-	}
+	
 	/*  select 语句的语法解析树*/
-    |SELECT select_attr FROM ID rel_list where  SEMICOLON{
+    SELECT select_attr FROM ID rel_list where  SEMICOLON{
 			selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
 
 			selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
@@ -2502,7 +2468,11 @@ where:
 condition_list:
     /* empty */
     | AND condition condition_list {
-			}
+		CONTEXT->ssql->sstr.selection.is_or=0;
+	}
+	|OR condition condition_list{
+		CONTEXT->ssql->sstr.selection.is_or=1;
+	}
     ;
 condition:
     expr comOp expr 

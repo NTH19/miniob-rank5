@@ -59,7 +59,7 @@ public:
   const std::vector<std::pair<DescribeFun,Field>> & funs()const {return funs_;}
   int need_reverse;
 
-  int is_da=0;
+  int flag_=0;
   int group_num=0;
   Group_by* head=nullptr;
 

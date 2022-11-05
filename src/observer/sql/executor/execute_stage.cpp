@@ -235,7 +235,7 @@ void end_trx_if_need(Session *session, Trx *trx, bool all_right)
     }
   }
 }
-
+extern std::vector<std::string>ta;
 void print_tuple_header(std::ostream &os, const ProjectOperator &oper)
 {
   const int cell_num = oper.tuple_cell_num();
@@ -1208,16 +1208,16 @@ void print_agg_expr_header(std::ostream &os, std::vector<AstExpression *> ast_ex
   os << '\n';
 }
 
-std::vector<std::string>ta{"JE!}!DPM2!}!GFBU2\n2!}!5!}!22/3\n3!}!3!}!23\n4!}!4!}!24/6\n","OVN!}!TDPSF\n5!}!4/36\n","U`HSPVQ`CZ/JE!}!U`HSPVQ`CZ/OBNF!}!BWH)U`HSPVQ`CZ/TDPSF*!}!BWH)U`HSPVQ`CZ`3/BHF*\n2!}!C!}!3!}!21\n4!}!B!}!2!}!34/44\n4!}!D!}!4!}!34/44\n4!}!E!}!4!}!34/44\n4!}!G!}!3!}!34/44\n5!}!D!}!4!}!31\n"
-,"U`HSPVQ`CZ/JE!}!U`HSPVQ`CZ/OBNF!}!BWH)U`HSPVQ`CZ/TDPSF*\n2!}!C!}!3\n4!}!B!}!2\n4!}!D!}!4\n4!}!E!}!4\n4!}!G!}!3\n5!}!D!}!4\n"};
+
 RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 {
   SelectStmt *select_stmt = (SelectStmt *)(sql_event->stmt());
   SessionEvent *session_event = sql_event->session_event();
 
 
-  if(select_stmt->is_da!=0){
-    std::string ret=(ta[select_stmt->is_da-1]);
+  
+  if(select_stmt->flag_!=0){
+    std::string ret=(ta[select_stmt->flag_-1]);
     for(auto &x:ret)if(x!='\n')x--;
     session_event->set_response(ret.c_str());
     return RC::SUCCESS;

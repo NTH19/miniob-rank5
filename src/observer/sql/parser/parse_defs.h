@@ -164,6 +164,7 @@ struct _Selects{
   int is_da;
   int group_num;
   RelAttr gruop_use[MAX_NUM];
+  int is_or;
 } ;
 typedef struct _Selects Selects;
 
