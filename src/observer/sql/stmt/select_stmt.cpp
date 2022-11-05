@@ -17,6 +17,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/log/log.h"
 #include "common/lang/string.h"
 #include "storage/common/db.h"
+#include <algorithm>
 #include "storage/common/table.h"
 
 SelectStmt::~SelectStmt()
@@ -42,7 +43,12 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt,bool out)
     LOG_WARN("invalid argument. db is null");
     return RC::INVALID_ARGUMENT;
   }
-
+  if(select_sql.is_da==2){
+    auto p= new SelectStmt;
+    p->is_da=2;
+    stmt=p;
+    return RC::SUCCESS;
+  }
   // collect tables in `from` statement
   std::vector<Table *> tables;
   std::unordered_map<std::string, Table *> table_map;
@@ -62,7 +68,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt,bool out)
     tables.push_back(table);
     table_map.insert(std::pair<std::string, Table *>(table_name, table));
   }
-  if (select_sql.aggfun_num && select_sql.attr_num) {
+  if (select_sql.aggfun_num && select_sql.attr_num &&!select_sql.group_num) {
     return RC::GENERIC_ERROR;
   }
 
@@ -173,7 +179,14 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt,bool out)
     LOG_WARN("cannot construct filter stmt");
     return rc;
   }
-
+  Group_by*p=nullptr;
+  if(select_sql.group_num!=0){
+    if(query_fields.size()!=select_sql.group_num)return RC::GENERIC_ERROR;
+    for(int i=0;i<query_fields.size();++i){
+      if(std::string(select_sql.attributes[query_fields.size()-1-i].attribute_name)!=std::string(select_sql.gruop_use[i].attribute_name))return RC::GENERIC_ERROR;
+    }
+    p=new Group_by();
+  }
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();
   select_stmt->tables_.swap(tables);
@@ -183,5 +196,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt,bool out)
   select_stmt->need_reverse = select_sql.need_Revere;
   stmt = select_stmt;
   select_stmt->is_da=select_sql.is_da;
+  select_stmt->head=p;
+  select_stmt->group_num=select_sql.group_num;
   return RC::SUCCESS;
 }

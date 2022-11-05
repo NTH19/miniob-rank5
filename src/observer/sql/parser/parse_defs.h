@@ -112,6 +112,8 @@ struct _Selects{
   int need_Revere;
   int need_reverse_join;
   int is_da;
+  int group_num;
+  RelAttr gruop_use[MAX_NUM];
 } ;
 typedef struct _Selects Selects;
 

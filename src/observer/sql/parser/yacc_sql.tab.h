@@ -77,7 +77,7 @@ extern int yydebug;
     AVG_T = 278,                   /* AVG_T  */
     SUM_T = 279,                   /* SUM_T  */
     TRX_COMMIT = 280,              /* TRX_COMMIT  */
-    DABIAO = 281,                  /* DABIAO  */
+    DT = 281,                      /* DT  */
     TRX_ROLLBACK = 282,            /* TRX_ROLLBACK  */
     INT_T = 283,                   /* INT_T  */
     STRING_T = 284,                /* STRING_T  */
@@ -93,34 +93,37 @@ extern int yydebug;
     WHERE = 294,                   /* WHERE  */
     AND = 295,                     /* AND  */
     SET = 296,                     /* SET  */
-    ON = 297,                      /* ON  */
-    INNER_T = 298,                 /* INNER_T  */
-    JOIN_T = 299,                  /* JOIN_T  */
-    LOAD = 300,                    /* LOAD  */
-    DATA = 301,                    /* DATA  */
-    INFILE = 302,                  /* INFILE  */
-    EQ = 303,                      /* EQ  */
-    LT = 304,                      /* LT  */
-    GT = 305,                      /* GT  */
-    LE = 306,                      /* LE  */
-    GE = 307,                      /* GE  */
-    NE = 308,                      /* NE  */
-    EXIST_T = 309,                 /* EXIST_T  */
-    IN_T = 310,                    /* IN_T  */
-    LIKE = 311,                    /* LIKE  */
-    NOT = 312,                     /* NOT  */
-    IS = 313,                      /* IS  */
-    NULLL = 314,                   /* NULLL  */
-    NULLABLE = 315,                /* NULLABLE  */
-    UNIQUE = 316,                  /* UNIQUE  */
-    NUMBER = 317,                  /* NUMBER  */
-    FLOAT = 318,                   /* FLOAT  */
-    DATEE = 319,                   /* DATEE  */
-    ID = 320,                      /* ID  */
-    PATH = 321,                    /* PATH  */
-    SSS = 322,                     /* SSS  */
-    STAR = 323,                    /* STAR  */
-    STRING_V = 324                 /* STRING_V  */
+    BY = 297,                      /* BY  */
+    DT1 = 298,                     /* DT1  */
+    GROUP = 299,                   /* GROUP  */
+    ON = 300,                      /* ON  */
+    INNER_T = 301,                 /* INNER_T  */
+    JOIN_T = 302,                  /* JOIN_T  */
+    LOAD = 303,                    /* LOAD  */
+    DATA = 304,                    /* DATA  */
+    INFILE = 305,                  /* INFILE  */
+    EQ = 306,                      /* EQ  */
+    LT = 307,                      /* LT  */
+    GT = 308,                      /* GT  */
+    LE = 309,                      /* LE  */
+    GE = 310,                      /* GE  */
+    NE = 311,                      /* NE  */
+    EXIST_T = 312,                 /* EXIST_T  */
+    IN_T = 313,                    /* IN_T  */
+    LIKE = 314,                    /* LIKE  */
+    NOT = 315,                     /* NOT  */
+    IS = 316,                      /* IS  */
+    NULLL = 317,                   /* NULLL  */
+    NULLABLE = 318,                /* NULLABLE  */
+    UNIQUE = 319,                  /* UNIQUE  */
+    NUMBER = 320,                  /* NUMBER  */
+    FLOAT = 321,                   /* FLOAT  */
+    DATEE = 322,                   /* DATEE  */
+    ID = 323,                      /* ID  */
+    PATH = 324,                    /* PATH  */
+    SSS = 325,                     /* SSS  */
+    STAR = 326,                    /* STAR  */
+    STRING_V = 327                 /* STRING_V  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -129,7 +132,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 132 "yacc_sql.y"
+#line 134 "yacc_sql.y"
 
   struct _Attr *attr;
   struct _Condition *condition1;
@@ -140,7 +143,7 @@ union YYSTYPE
   float floats;
 	char *position;
 
-#line 144 "yacc_sql.tab.h"
+#line 147 "yacc_sql.tab.h"
 
 };
 typedef union YYSTYPE YYSTYPE;

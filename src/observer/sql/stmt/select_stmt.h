@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include <vector>
+#include<map>
 
 #include "rc.h"
 #include "sql/stmt/stmt.h"
@@ -24,6 +25,13 @@ class FieldMeta;
 class FilterStmt;
 class Db;
 class Table;
+
+struct Group_by{
+  std::map<int,Group_by*>zhu;
+  std::vector<std::pair<int,int>>ret;
+  std::vector<int>char_len;
+  std::string ans;
+};
 
 class SelectStmt : public Stmt
 {
@@ -42,12 +50,14 @@ public:
   FilterStmt *filter_stmt() const { return filter_stmt_; }
   const std::vector<std::pair<DescribeFun,Field>> & funs()const {return funs_;}
   int need_reverse;
-  bool is_da=0;
+  int is_da=0;
+  int group_num=0;
+  Group_by* head=nullptr;
 private:
   std::vector<Field> query_fields_;
   std::vector<Table *> tables_;
   std::vector<std::pair<DescribeFun,Field>> funs_;
   FilterStmt *filter_stmt_ = nullptr;
-  
+
 };
 

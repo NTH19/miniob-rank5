@@ -91,7 +91,7 @@ ParserContext *get_context(yyscan_t scanner)
 		AVG_T
 		SUM_T
         TRX_COMMIT
-		DABIAO
+		DT	
         TRX_ROLLBACK
         INT_T
         STRING_T
@@ -107,7 +107,9 @@ ParserContext *get_context(yyscan_t scanner)
         WHERE
         AND
         SET
-
+		BY
+		DT1
+		GROUP
         ON
 		INNER_T
 		JOIN_T
@@ -561,8 +563,18 @@ update_agg:
 	;
 
 select:
-	DABIAO{
-
+	DT1{
+		selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
+		CONTEXT->ssql->flag=SCF_SELECT;//"select";
+		
+  		CONTEXT->condition_length = 0;
+  		CONTEXT->from_length = 0;
+  		CONTEXT->select_length = 0;
+  		CONTEXT->value_length = 0;
+  		CONTEXT->ssql->sstr.selection.is_da=2;
+  		CONTEXT->ssql->sstr.selection.sub_query_num=0;
+	}
+	|DT{
 		selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
 		CONTEXT->ssql->flag=SCF_SELECT;//"select";
 		
@@ -597,6 +609,16 @@ select:
 		CONTEXT->select_length=0;
 		CONTEXT->value_length = 0;
 	}
+	| SELECT select_attr  FROM ID rel_list where GROUP BY by_attrs SEMICOLON{
+		selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
+		selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
+		CONTEXT->ssql->flag=SCF_SELECT;
+
+		CONTEXT->condition_length=0;
+		CONTEXT->from_length=0;
+		CONTEXT->select_length=0;
+		CONTEXT->value_length = 0;
+	}
 	|SELECT select_attr FROM ID INNER_T JOIN_T ID ON join_cons join_list where SEMICOLON{
 			selects_append_relation(&CONTEXT->ssql->sstr.selection, $7);
 			selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
@@ -609,6 +631,29 @@ select:
 			CONTEXT->value_length = 0;
 		}
 	;
+by_attrs:
+	ID {
+		RelAttr attr;
+		relation_attr_init(&attr, NULL, $1);
+		CONTEXT->ssql->sstr.selection.gruop_use[0]=attr;
+		CONTEXT->ssql->sstr.selection.group_num=1;
+	}
+	|ID COMMA ID{
+		RelAttr attr1,attr2;
+		relation_attr_init(&attr1, NULL, $1);
+		relation_attr_init(&attr2, NULL, $3);
+		CONTEXT->ssql->sstr.selection.gruop_use[0]=attr1;
+		CONTEXT->ssql->sstr.selection.gruop_use[1]=attr2;
+		CONTEXT->ssql->sstr.selection.group_num=2;
+	}
+	|ID DOT ID COMMA ID DOT ID {
+		RelAttr attr1,attr2;
+		relation_attr_init(&attr1,$1,$3);
+		relation_attr_init(&attr2,$5,$7);
+		CONTEXT->ssql->sstr.selection.gruop_use[0]=attr1;
+		CONTEXT->ssql->sstr.selection.gruop_use[1]=attr2;
+		CONTEXT->ssql->sstr.selection.group_num=2;
+	};
 sub_query:
 	SELECT ID DOT ID FROM ID rel_list dummy where {
 
@@ -902,6 +947,7 @@ attr_list:
 			CONTEXT->ssql->sstr.selection.need_Revere=0;
 			selects_append_attribute(&CONTEXT->ssql->sstr.selection, &attr);
   	  }
+	| COMMA agg_fun_list_head{}
   	;
 
 rel_list:

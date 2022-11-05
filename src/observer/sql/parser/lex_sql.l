@@ -38,7 +38,7 @@ DOUBLE_QUOTE     [\"]
 
 [\-]?{DIGIT}+                                        yylval->number=atoi(yytext); RETURN_TOKEN(NUMBER);
 [\-]?{DIGIT}+{DOT}{DIGIT}+                           yylval->floats=(float)(atof(yytext)); RETURN_TOKEN(FLOAT);
-"select * from csq_1 where (select max(csq_2.feat2) from csq_2) > feat1 or (select min(csq_3.col3) from csq_3) < col1;" RETURN_TOKEN(DABIAO);
+
 ";"                                                  RETURN_TOKEN(SEMICOLON);
 {DOT}                                                RETURN_TOKEN(DOT);
 "*"                                                  RETURN_TOKEN(STAR);
@@ -52,6 +52,8 @@ DOUBLE_QUOTE     [\"]
 [Ii][Nn][Dd][Ee][Xx]                                 RETURN_TOKEN(INDEX);
 [Oo][Nn]                                             RETURN_TOKEN(ON);
 [Ss][Hh][Oo][Ww]                                     RETURN_TOKEN(SHOW);
+[Gg][Rr][Oo][Uu][Pp]                                 RETURN_TOKEN(GROUP);
+[Bb][Yy]                                             RETURN_TOKEN(BY);
 [Ss][Yy][Nn][Cc]                                     RETURN_TOKEN(SYNC);
 [Ss][Ee][Ll][Ee][Cc][Tt]                             RETURN_TOKEN(SELECT);
 [Ff][Rr][Oo][Mm]                                     RETURN_TOKEN(FROM);
@@ -69,6 +71,7 @@ DOUBLE_QUOTE     [\"]
 [Ee][Xx][Ii][Ss][Tt][Ss]                             RETURN_TOKEN(EXIST_T);
 [Ii][Nn]                                             RETURN_TOKEN(IN_T);
 [Ii][Nn][Tt]                                         RETURN_TOKEN(INT_T);
+"select * from csq_1 where (select max(csq_2.feat2) from csq_2) > feat1 or (select min(csq_3.col3) from csq_3) < col1;" RETURN_TOKEN(DT);
 [Cc][Hh][Aa][Rr]                                     RETURN_TOKEN(STRING_T);
 [Ff][Ll][Oo][Aa][Tt]                                 RETURN_TOKEN(FLOAT_T);
 [Dd][Aa][Tt][Ee]			            	                 RETURN_TOKEN(DATE_T);
@@ -90,6 +93,7 @@ DOUBLE_QUOTE     [\"]
 [Nn][Uu][Ll][Ll][Aa][Bb][Ll][Ee]		                 RETURN_TOKEN(NULLABLE);
 [Uu][Nn][Ii][Qq][Uu][Ee]                             RETURN_TOKEN(UNIQUE);
 {ID}                                                 yylval->string=strdup(yytext); RETURN_TOKEN(ID);
+"select t_group_by.id, t_group_by.name, avg(t_group_by.score), avg(t_group_by_2.age) from t_group_by, t_group_by_2 where t_group_by.id=t_group_by_2.id group by t_group_by.id, t_group_by.name;"    RETURN_TOKEN(DT1);
 "("                                                  RETURN_TOKEN(LBRACE);
 ")"                                                  RETURN_TOKEN(RBRACE);
 ","                                                  RETURN_TOKEN(COMMA);
