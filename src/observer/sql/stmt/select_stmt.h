@@ -34,6 +34,12 @@ struct Group_by{
   std::vector<int>char_len;
   std::string ans;
 };
+//假设要么agg在select 中出现要么是count
+struct hav_con{
+  CompOp op;
+  bool is_count;
+  int num;
+};
 
 class SelectStmt : public Stmt
 {
@@ -60,9 +66,8 @@ public:
   std::map<std::string,std::queue<std::string>> aliasset_;
   std::vector<std::pair<Field,int>>   order_fields;
   std::vector<AstExpression *> ast_exprs_;
-
   std::vector<std::pair<DescribeFun,Field>> funs_;
-
+  hav_con* hav=nullptr;
 private:
   std::vector<Field> query_fields_;
   std::vector<Table *> tables_;

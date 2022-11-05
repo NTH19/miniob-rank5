@@ -133,10 +133,9 @@ ParserContext *get_context(yyscan_t scanner)
 		NULLL
 		NULLABLE
 		UNIQUE
+		HAVING
 		ORDER
         BY
-		DT3
-		DT4
 		ADD
 		SUB
 		DIV
@@ -584,31 +583,15 @@ update_agg:
 	}
 	;
 
-
+having:
+	|HAVING expr comOp expr 
+	{
+		Condition condition;
+		condition_init_from_expr(&condition, CONTEXT->comp, $2, $4);
+		selects_setup_having_condition(&CONTEXT->ssql->sstr.selection,&condition);
+	}; 
 select:
-	DT3{
-		selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
-		CONTEXT->ssql->flag=SCF_SELECT;//"select";
-		
-  		CONTEXT->condition_length = 0;
-  		CONTEXT->from_length = 0;
-  		CONTEXT->select_length = 0;
-  		CONTEXT->value_length = 0;
-  		CONTEXT->ssql->sstr.selection.is_da=5;
-  		CONTEXT->ssql->sstr.selection.sub_query_num=0;
-	}
-	|DT4{
-		selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
-		CONTEXT->ssql->flag=SCF_SELECT;//"select";
-		
-  		CONTEXT->condition_length = 0;
-  		CONTEXT->from_length = 0;
-  		CONTEXT->select_length = 0;
-  		CONTEXT->value_length = 0;
-  		CONTEXT->ssql->sstr.selection.is_da=6;
-  		CONTEXT->ssql->sstr.selection.sub_query_num=0;
-	}
-	|DT1{
+	DT1{
 		selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
 		CONTEXT->ssql->flag=SCF_SELECT;//"select";
 		
@@ -656,7 +639,7 @@ select:
 			CONTEXT->value_length = 0;
 	}
 
-	| SELECT select_attr  FROM ID rel_list where GROUP BY by_attrs SEMICOLON{
+	| SELECT select_attr  FROM ID rel_list where GROUP BY by_attrs having SEMICOLON{
 		selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
 		selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);
 		CONTEXT->ssql->flag=SCF_SELECT;

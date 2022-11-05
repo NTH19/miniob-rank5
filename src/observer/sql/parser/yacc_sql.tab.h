@@ -118,21 +118,20 @@ extern int yydebug;
     NULLL = 319,                   /* NULLL  */
     NULLABLE = 320,                /* NULLABLE  */
     UNIQUE = 321,                  /* UNIQUE  */
-    ORDER = 322,                   /* ORDER  */
-    BY = 323,                      /* BY  */
-    DT3 = 324,                     /* DT3  */
-    DT4 = 325,                     /* DT4  */
-    ADD = 326,                     /* ADD  */
-    SUB = 327,                     /* SUB  */
-    DIV = 328,                     /* DIV  */
-    NUMBER = 329,                  /* NUMBER  */
-    FLOAT = 330,                   /* FLOAT  */
-    DATEE = 331,                   /* DATEE  */
-    ID = 332,                      /* ID  */
-    PATH = 333,                    /* PATH  */
-    SSS = 334,                     /* SSS  */
-    STAR = 335,                    /* STAR  */
-    STRING_V = 336                 /* STRING_V  */
+    HAVING = 322,                  /* HAVING  */
+    ORDER = 323,                   /* ORDER  */
+    BY = 324,                      /* BY  */
+    ADD = 325,                     /* ADD  */
+    SUB = 326,                     /* SUB  */
+    DIV = 327,                     /* DIV  */
+    NUMBER = 328,                  /* NUMBER  */
+    FLOAT = 329,                   /* FLOAT  */
+    DATEE = 330,                   /* DATEE  */
+    ID = 331,                      /* ID  */
+    PATH = 332,                    /* PATH  */
+    SSS = 333,                     /* SSS  */
+    STAR = 334,                    /* STAR  */
+    STRING_V = 335                 /* STRING_V  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -141,7 +140,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 144 "yacc_sql.y"
+#line 143 "yacc_sql.y"
 
   struct _Attr *attr;
   struct _Condition *condition1;
@@ -154,7 +153,7 @@ union YYSTYPE
   struct _AstExpr *expr1;
   enum _CompOp compOp1;
 
-#line 158 "yacc_sql.tab.h"
+#line 157 "yacc_sql.tab.h"
 
 };
 typedef union YYSTYPE YYSTYPE;

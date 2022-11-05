@@ -54,6 +54,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
     stmt=p;
     return RC::SUCCESS;
   }
+  hav_con* hav_ptr=nullptr;
   std::map<std::string, std::queue<std::string>> alias_name_map;
   std::map<std::string, std::queue<std::string>> name_alias_map;
   if (alias_name_set != nullptr) {
@@ -260,6 +261,12 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
       if(std::string(select_sql.attributes[query_fields.size()-1-i].attribute_name)!=std::string(select_sql.gruop_use[i].attribute_name))return RC::GENERIC_ERROR;
     }
     p=new Group_by();
+    if(select_sql.ha_num!=0){
+      hav_ptr=new hav_con;
+      hav_ptr->is_count=select_sql.hav_con[0].left_expr->agg.des==COUNT_STAR;
+      hav_ptr->op=select_sql.hav_con[0].comp;
+      hav_ptr->num=*(int*)select_sql.hav_con[0].right_value.data;
+    }
   }
 
   // collect orderfields
@@ -292,6 +299,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
 
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();
+  select_stmt->hav=hav_ptr;
   select_stmt->tables_.swap(tables);
   select_stmt->funs_.swap(funs);
   select_stmt->query_fields_.swap(query_fields);

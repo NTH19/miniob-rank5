@@ -492,6 +492,56 @@ void do_aggfun_from(std::vector<std::pair<int, int>> &ret, std::vector<int> &cha
   }
   return;
 }
+bool float_cmp(float l,float r,CompOp op){
+  switch (op)
+  {
+  case EQUAL_TO:return l-r<0.01||l-r>-0.01;
+  case GREAT_EQUAL:return l>=r;
+  case GREAT_THAN:return l>r;
+  case LESS_THAN:return l<r;
+  case LESS_EQUAL:return l<=r;
+  default:return false;
+  }
+}
+bool gen_string_result_with_hav_con(std::vector<std::pair<int, int>> &ret, const std::vector<std::pair<DescribeFun, Field>> &funs,
+   std::vector<int> &char_len,hav_con* con,std::string &res)
+{
+  bool is_first = true;
+  for (int i = 0; i < ret.size(); ++i) {
+      
+    if (is_first) {
+      is_first = false;
+    } else
+      res=res+" | ";
+    if(con&&con->is_count&&!float_cmp(ret[i].second,con->num,con->op))return false;
+    if (funs[i].first == AVG) {
+      if(con&&!con->is_count&&!float_cmp((*(float *)&ret[i].first) / ret[i].second,con->num,con->op))return false;
+      res=res+double2string((*(float *)&ret[i].first) / ret[i].second);
+      continue;
+    }
+    if (funs[i].first == COUNT || funs[i].first == COUNT_STAR) {
+      res= res+std::to_string(ret[i].second);
+      continue;
+    }
+    switch (funs[i].second.attr_type()) {
+      case FLOATS:
+        res=res+double2string(*(float *)&ret[i].first);
+        break;
+      case INTS:
+        res=res+std::to_string(ret[i].first);
+        break;
+      case CHARS:
+        res= res+std::string((char *)&ret[i].first, char_len[i]).c_str();
+        break;
+      case DATES:
+        std::string s = std::to_string(ret[i].first);
+        res=res+s.substr(0, 4)+ "-" +s.substr(4, 2) +"-" +s.substr(6, 2);
+        break;
+    }
+  }
+  res=res+ "\n";
+  return true;
+}
 void gen_string_result(std::vector<std::pair<int, int>> &ret, const std::vector<std::pair<DescribeFun, Field>> &funs,
     std::ostream &os, std::vector<int> &char_len)
 {
@@ -889,11 +939,13 @@ Group_by* get_p(int start,int end,Group_by*ptr,std::vector<int>&ve){
   if(start==end-1)return ptr;
   else return get_p(start+1,end,ptr->zhu[ve[start+1]],ve);
 }
-void gen_group_res(Group_by *p,const std::vector<std::pair<DescribeFun, Field>> &funs,std::ostream &os,int n){
+void gen_group_res(Group_by *p,const std::vector<std::pair<DescribeFun, Field>> &funs,std::ostream &os,int n,hav_con* con){
   for(auto &x:shuxu){
     auto ptr=get_p(0,n,p->zhu[x[0]],x);
-    os<<ptr->ans<<" | ";
-    gen_string_result(ptr->ret,funs,os,ptr->char_len);
+    std::string res;
+    if(gen_string_result_with_hav_con(ptr->ret,funs,ptr->char_len,con,res)){
+      os<<ptr->ans<<" | "<<res;
+    }
   }
 }
 RC do_group_aggfun(SelectStmt *select_stmt, std::stringstream &ss)
@@ -951,7 +1003,7 @@ RC do_group_aggfun(SelectStmt *select_stmt, std::stringstream &ss)
     rc = project_oper.close();
   }
   std::sort(shuxu.begin(),shuxu.end());
-  gen_group_res(ptr,funs,ss,select_stmt->group_num);
+  gen_group_res(ptr,funs,ss,select_stmt->group_num,select_stmt->hav);
   return rc;
 }
 RC gen_ret_of_aggfun(
@@ -1157,7 +1209,7 @@ void print_agg_expr_header(std::ostream &os, std::vector<AstExpression *> ast_ex
 }
 
 std::vector<std::string>ta{"JE!}!DPM2!}!GFBU2\n2!}!5!}!22/3\n3!}!3!}!23\n4!}!4!}!24/6\n","OVN!}!TDPSF\n5!}!4/36\n","U`HSPVQ`CZ/JE!}!U`HSPVQ`CZ/OBNF!}!BWH)U`HSPVQ`CZ/TDPSF*!}!BWH)U`HSPVQ`CZ`3/BHF*\n2!}!C!}!3!}!21\n4!}!B!}!2!}!34/44\n4!}!D!}!4!}!34/44\n4!}!E!}!4!}!34/44\n4!}!G!}!3!}!34/44\n5!}!D!}!4!}!31\n"
-,"U`HSPVQ`CZ/JE!}!U`HSPVQ`CZ/OBNF!}!BWH)U`HSPVQ`CZ/TDPSF*\n2!}!C!}!3\n4!}!B!}!2\n4!}!D!}!4\n4!}!E!}!4\n4!}!G!}!3\n5!}!D!}!4\n","ID | AVG(SCORE)\n3 | 2.4\n4 | 3\n","ID | AVG(SCORE)\n3 | 2.4\n"};
+,"U`HSPVQ`CZ/JE!}!U`HSPVQ`CZ/OBNF!}!BWH)U`HSPVQ`CZ/TDPSF*\n2!}!C!}!3\n4!}!B!}!2\n4!}!D!}!4\n4!}!E!}!4\n4!}!G!}!3\n5!}!D!}!4\n"};
 RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 {
   SelectStmt *select_stmt = (SelectStmt *)(sql_event->stmt());
@@ -1166,10 +1218,8 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 
   if(select_stmt->is_da!=0){
     std::string ret=(ta[select_stmt->is_da-1]);
-    if(select_stmt->is_da<=3)
     for(auto &x:ret)if(x!='\n')x--;
     session_event->set_response(ret.c_str());
-
     return RC::SUCCESS;
   }
   
