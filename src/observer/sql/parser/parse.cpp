@@ -229,7 +229,17 @@ void attr_info_destroy(AttrInfo *attr_info)
   attr_info->_nullable = 0;
 }
 
-void selects_init(Selects *selects, ...);
+void selects_init(Selects *selects) {
+  selects->attr_num = 0;
+  selects->aggfun_num = 0;
+  selects->relation_num = 0;
+  selects->expr_num = 0;
+  selects->sub_query_num = 0;
+  selects->alias_num = 0;
+  selects->condition_num = 0;
+  selects->order_num = 0;
+}
+
 void selects_append_attribute(Selects *selects, RelAttr *rel_attr)
 {
   selects->attributes[selects->attr_num++] = *rel_attr;
@@ -381,7 +391,7 @@ void selects_destroy(Selects *selects)
     free(selects->alias_name[i]);
     free(selects->real_name[i]);
     selects->alias_name[i]=NULL;
-    selects->real_name[i]-NULL;
+    selects->real_name[i]=NULL;
   }
   selects->alias_num = 0;
   for (size_t i = 0; i < selects->order_num; i++) {

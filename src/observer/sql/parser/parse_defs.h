@@ -157,11 +157,10 @@ struct _Selects{
   char * real_name[MAX_NUM];
   char * alias_name[MAX_NUM];
   size_t alias_num;
-   size_t    order_num;
+  size_t    order_num;
   OrderBy   order_by[MAX_NUM];
   int dabiao;
   int is_da;
-
 } ;
 typedef struct _Selects Selects;
 
@@ -319,7 +318,7 @@ void Init_AggFun(AggFun * a, DescribeFun des, const char* arr_name);
 void Init_AggFun1(AggFun * a, DescribeFun des, const char* arr_name,const char * alias_name);
 void Init_AggFun_Rel(AggFun *a, DescribeFun des, const char* rel_name, const char* arr_name);
 
-void selects_init(Selects *selects, ...);
+void selects_init(Selects *selects);
 void selects_append_aggfun(Selects *selects, AggFun * a);
 void selects_reverse_append_aggfun(Selects *selects, AggFun * a);
 void selects_append_order(Selects *selects, RelAttr *rel_attr, int order);
