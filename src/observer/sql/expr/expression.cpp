@@ -12,7 +12,7 @@ See the Mulan PSL v2 for more details. */
 // Created by Wangyunlai on 2022/07/05.
 //
 
-#include "sql/expr/tuple.h"
+#include "sql/expr/expression.h"
 #include "../operator/predicate_operator.h"
 #include "../operator/table_scan_operator.h"
 #include "../operator/project_operator.h"
@@ -125,10 +125,12 @@ inline RC get_valuse_from_signle_field_select(std::vector<TupleCell> &values, Se
   pred_oper.add_child(scan_oper);
   ProjectOperator project_oper;
   project_oper.add_child(&pred_oper);
+  std::map<std::string, std::queue<std::string>> alias_set;
+  alias_set.swap(select_stmt->aliasset_);
   if (select_stmt->query_fields().size() != 1)
     return RC::GENERIC_ERROR;
   for (const Field &field : select_stmt->query_fields()) {
-    project_oper.add_projection(field.table(), field.meta());
+    project_oper.add_projection(field.table(), field.meta(),false,alias_set);
   }
   rc = project_oper.open();
   if (rc != RC::SUCCESS) {
@@ -259,4 +261,181 @@ bool ExitsnotExits::do_compare(Tuple *left)
   pred_oper2.close();
   delete scan_oper2;
   return canAdd;
+}
+
+TupleCell null_cell() {
+  TupleCell cell;
+  char *data = new char[4];
+  memcpy(data, __NULL_DATA__, 4);
+  cell.set_data(data);
+  cell.set_type(CHARS);
+  cell.set_length(4);
+  return cell;
+}
+
+float cell2float(TupleCell &cell) {
+  if (cell.attr_type() == INTS) {
+    return *(int *)cell.data();
+  } else if(cell.attr_type() == FLOATS) {
+    return *(float *)cell.data();
+  } else {
+    return 0;
+  }
+}
+
+TupleCell cell_from_float(float val) {
+  TupleCell cell;
+  float *value = new float(val);
+  cell.set_data((char *)value);
+  cell.set_type(FLOATS);
+  return cell;
+}
+
+TupleCell calculate(const AstExpression *ast_expr, const Tuple &tuple) {
+  TupleCell cell;
+  if(ast_expr == nullptr) {
+    return cell_from_float(0);
+  }
+  switch (ast_expr->expr_type)
+  {
+  case AstExprType::VALUE_EXPR: {
+    auto &value = ast_expr->value;
+    cell.set_data((char *)value.data);
+    cell.set_type(value.type);
+    if (value.data != nullptr && value.type == CHARS) {
+      cell.set_length(strlen((const char *)value.data));
+    }
+  } break;
+  case AstExprType::ATTR_EXPR: {
+    RC rc = tuple.find_cell(ast_expr->field, cell);
+    if (rc != RC::SUCCESS) {
+      LOG_PANIC("failed to get attr");
+    }
+  } break;
+  case AstExprType::AGG_EXPR:
+    // TODO: ???
+    break;
+  default: {
+    TupleCell left_cell = calculate(ast_expr->left, tuple);
+    TupleCell right_cell = calculate(ast_expr->right, tuple);
+    if (left_cell.check_null() || right_cell.check_null()) {
+      return null_cell();
+    }
+    float l_val = cell2float(left_cell);
+    float r_val = cell2float(right_cell);
+    switch (ast_expr->expr_type)
+    {
+    case AstExprType::ADD_OP:
+      cell = cell_from_float(l_val + r_val);
+      break;
+    case AstExprType::SUB_OP:
+      cell = cell_from_float(l_val - r_val);
+      break;
+    case AstExprType::MUL_OP:
+      cell = cell_from_float(l_val * r_val);
+      break;
+    case AstExprType::DIV_OP:
+      if (r_val == 0) {
+        return null_cell();
+      }
+      cell = cell_from_float(l_val / r_val);
+      break;
+    }
+  } break;
+  }
+  return cell;
+}
+
+RC AstExpression::get_value(const Tuple &tuple, TupleCell &cell) const {
+  cell = calculate(this, tuple);
+  LOG_INFO("ast expr[%s] call result: %f", this->alias.c_str(), cell2float(cell));
+  return RC::SUCCESS;
+}
+
+TupleCell calculate_agg(const DescribeFun &agg, const Field &field, std::pair<int, int> ret) {
+  if (ret.second == 0 && agg != COUNT && agg != COUNT_STAR) {
+    return null_cell();
+  }
+  if (agg == AVG) {
+    return cell_from_float((*(float *)&ret.first) / ret.second);
+  }
+  if (agg == COUNT || agg == COUNT_STAR) {
+    return cell_from_float(ret.second);
+  }
+  switch (field.attr_type()) {
+    case FLOATS:
+      return cell_from_float((*(float *)&ret.first));
+    case INTS:
+      return cell_from_float(ret.first);
+  }
+  return cell_from_float(0);
+}
+
+TupleCell AstExpression::calculate_multi(const AstExpression *ast_expr, const std::vector<Table *> &tables, std::vector<RowTuple *> tuples,
+                                         const std::vector<std::pair<DescribeFun, Field>> &aggs, const std::vector<std::pair<int, int>> &agg_ret) 
+{
+  TupleCell cell;
+  if(ast_expr == nullptr) {
+    return cell_from_float(0);
+  }
+  switch (ast_expr->expr_type)
+  {
+  case AstExprType::VALUE_EXPR: {
+    auto &value = ast_expr->value;
+    cell.set_data((char *)value.data);
+    cell.set_type(value.type);
+    if (value.data != nullptr && value.type == CHARS) {
+      cell.set_length(strlen((const char *)value.data));
+    }
+  } break;
+  case AstExprType::ATTR_EXPR: {
+    for(size_t i = 0; i < tables.size(); i ++) {
+      if (strcmp(tables[i]->name(), ast_expr->field.table_name()) == 0) {
+        RC rc = tuples[i]->find_cell(ast_expr->field, cell);
+        if(rc != RC::SUCCESS) {
+          LOG_PANIC("failed to find cell in calculate_multi");
+        }
+        break;
+      }
+    }
+  } break;
+  case AstExprType::AGG_EXPR:
+    for(size_t i = 0; i < aggs.size(); i ++) {
+      auto &p = aggs[i];
+      if (p.first == ast_expr->agg && strcmp(p.second.table_name(), ast_expr->field.table_name()) == 0
+          && strcmp(p.second.field_name(), ast_expr->field.field_name()) == 0 ) {
+        cell = calculate_agg(ast_expr->agg, ast_expr->field, agg_ret[i]);
+        break;
+      }
+    }
+    break;
+  default: {
+    TupleCell left_cell = calculate_multi(ast_expr->left, tables, tuples, aggs, agg_ret);
+    TupleCell right_cell = calculate_multi(ast_expr->right, tables, tuples, aggs, agg_ret);
+    if (left_cell.check_null() || right_cell.check_null()) {
+      return null_cell();
+    }
+    float l_val = cell2float(left_cell);
+    float r_val = cell2float(right_cell);
+    switch (ast_expr->expr_type)
+    {
+    case AstExprType::ADD_OP:
+      cell = cell_from_float(l_val + r_val);
+      break;
+    case AstExprType::SUB_OP:
+      cell = cell_from_float(l_val - r_val);
+      break;
+    case AstExprType::MUL_OP:
+      cell = cell_from_float(l_val * r_val);
+      break;
+    case AstExprType::DIV_OP:
+      if (r_val == 0) {
+        return null_cell();
+      }
+      cell = cell_from_float(l_val / r_val);
+      break;
+    }
+  } break;
+  }
+  return cell;
 }

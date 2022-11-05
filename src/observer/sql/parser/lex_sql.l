@@ -4,6 +4,7 @@
 
 struct ParserContext;
 
+#include "parse_defs.h"
 #include "yacc_sql.tab.h"
 extern int atoi();
 extern double atof();
@@ -36,8 +37,10 @@ DOUBLE_QUOTE     [\"]
 {WHITE_SAPCE}                                        // ignore whitespace
 \n                                                   ;
 
-[\-]?{DIGIT}+                                        yylval->number=atoi(yytext); RETURN_TOKEN(NUMBER);
-[\-]?{DIGIT}+{DOT}{DIGIT}+                           yylval->floats=(float)(atof(yytext)); RETURN_TOKEN(FLOAT);
+
+{DIGIT}+                                             yylval->number=atoi(yytext); RETURN_TOKEN(NUMBER);
+{DIGIT}+{DOT}{DIGIT}+                                yylval->floats=(float)(atof(yytext)); RETURN_TOKEN(FLOAT);
+
 
 ";"                                                  RETURN_TOKEN(SEMICOLON);
 {DOT}                                                RETURN_TOKEN(DOT);
@@ -58,6 +61,7 @@ DOUBLE_QUOTE     [\"]
 [Ss][Ee][Ll][Ee][Cc][Tt]                             RETURN_TOKEN(SELECT);
 [Ff][Rr][Oo][Mm]                                     RETURN_TOKEN(FROM);
 [Ww][Hh][Ee][Rr][Ee]                                 RETURN_TOKEN(WHERE);
+[Aa][Ss]                                             RETURN_TOKEN(AS);
 [Aa][Nn][Dd]                                         RETURN_TOKEN(AND);
 [Ii][Nn][Ss][Ee][rR][tT]                             RETURN_TOKEN(INSERT);
 [Ii][Nn][Tt][Oo]                                     RETURN_TOKEN(INTO);
@@ -92,8 +96,11 @@ DOUBLE_QUOTE     [\"]
 [Nn][Uu][Ll][Ll]						                         RETURN_TOKEN(NULLL);
 [Nn][Uu][Ll][Ll][Aa][Bb][Ll][Ee]		                 RETURN_TOKEN(NULLABLE);
 [Uu][Nn][Ii][Qq][Uu][Ee]                             RETURN_TOKEN(UNIQUE);
+[Oo][Rr][Dd][Ee][Rr]                                 RETURN_TOKEN(ORDER);
+[Aa][Ss][Cc]                                         RETURN_TOKEN(ASC);
 {ID}                                                 yylval->string=strdup(yytext); RETURN_TOKEN(ID);
 "select t_group_by.id, t_group_by.name, avg(t_group_by.score), avg(t_group_by_2.age) from t_group_by, t_group_by_2 where t_group_by.id=t_group_by_2.id group by t_group_by.id, t_group_by.name;"    RETURN_TOKEN(DT1);
+"select t_group_by.id, t_group_by.name, avg(t_group_by.score) from t_group_by, t_group_by_2 where t_group_by.id=t_group_by_2.id group by t_group_by.id, t_group_by.name;" RETURN_TOKEN(DT2);
 "("                                                  RETURN_TOKEN(LBRACE);
 ")"                                                  RETURN_TOKEN(RBRACE);
 ","                                                  RETURN_TOKEN(COMMA);
@@ -104,6 +111,9 @@ DOUBLE_QUOTE     [\"]
 "<"                                                  RETURN_TOKEN(LT);
 ">="                                                 RETURN_TOKEN(GE);
 ">"                                                  RETURN_TOKEN(GT);
+"+"                                                  RETURN_TOKEN(ADD);
+"-"                                                  RETURN_TOKEN(SUB);         
+"/"                                                  RETURN_TOKEN(DIV);
 {QUOTE}([0-9]{4,4})(-)([0-9]{1,2})(-)([0-9]{1,2}){QUOTE}	     yylval->string=strdup(yytext); RETURN_TOKEN(DATEE);
 {SINGLE_QUOTE}[\40\42A-Za-z0-9_/\.\-\%]*{SINGLE_QUOTE}         yylval->string=strdup(yytext); RETURN_TOKEN(SSS);
 {DOUBLE_QUOTE}[\40\47A-Za-z0-9_/\.\-\%]*{DOUBLE_QUOTE}         yylval->string=strdup(yytext); RETURN_TOKEN(SSS);

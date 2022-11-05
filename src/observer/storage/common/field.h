@@ -43,7 +43,10 @@ public:
   {
     this->field_ = field;
   }
+  const char * aliasname=nullptr;
+  int order=0;
 private:
   const Table *table_ = nullptr;
   const FieldMeta *field_ = nullptr;
+
 };

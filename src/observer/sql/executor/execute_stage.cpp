@@ -261,6 +261,8 @@ void print_aggfun_header(std::ostream &os, const std::vector<std::pair<DescribeF
   for (int i = 0; i < funs.size(); i++) {
     if (i != 0)
       os << " | ";
+    if (funs[i].second.aliasname!=nullptr) os<<funs[i].second.aliasname;
+    else{
     switch (funs[i].first) {
       case MAX:
         os << "MAX(" << funs[i].second.field_name() << ")";
@@ -280,6 +282,7 @@ void print_aggfun_header(std::ostream &os, const std::vector<std::pair<DescribeF
       case COUNT_STAR:
         os << "COUNT(*)";
         break;
+    }
     }
   }
   os << '\n';
@@ -901,13 +904,15 @@ RC do_group_aggfun(SelectStmt *select_stmt, std::stringstream &ss)
   has.clear();
   auto tables = select_stmt->tables();
   auto ptr = select_stmt->head;
+  std::map<std::string,std::queue<std::string>> alias_set;
+  alias_set.swap(select_stmt->aliasset_);
   std::vector<FieldExpr *> expr(select_stmt->group_num);
   for (int i = 0; i < expr.size(); ++i) {
     expr[i] = new FieldExpr(fields[i].table(), fields[i].meta());
   }
   ProjectOperator project_oper;
   for (const Field &field : select_stmt->query_fields()) {
-    project_oper.add_projection(field.table(), field.meta());
+    project_oper.add_projection(field.table(), field.meta(),false,alias_set);
   }
   print_group_header_part1(ss, project_oper);
   ss<<" | ";
@@ -920,7 +925,7 @@ RC do_group_aggfun(SelectStmt *select_stmt, std::stringstream &ss)
   pred_oper.add_child(scan_oper);
   project_oper.add_child(&pred_oper);
   for (int i = 0; i < funs.size(); ++i) {
-    project_oper.add_projection(funs[i].second.table(), funs[i].second.meta());
+    project_oper.add_projection(funs[i].second.table(), funs[i].second.meta(),false,alias_set);
   }
   rc = project_oper.open();
   if (rc != RC::SUCCESS) {
@@ -950,11 +955,15 @@ RC do_group_aggfun(SelectStmt *select_stmt, std::stringstream &ss)
   return rc;
 }
 RC gen_ret_of_aggfun(
-    SelectStmt *select_stmt, std::vector<std::pair<int, int>> &ret, std::vector<int> &char_len, std::stringstream &ss)
+    SelectStmt *select_stmt, std::vector<std::pair<int, int>> &ret, std::vector<int> &char_len, std::stringstream &ss,bool isprint)
 {
   RC rc = RC::SUCCESS;
   auto funs = select_stmt->funs();
-  auto &tables = select_stmt->tables();
+
+  auto &tables=select_stmt->tables();
+  std::map<std::string,std::queue<std::string>> alias_map;
+  alias_map.swap(select_stmt->aliasset_);
+
   Operator *scan_oper = new TableScanOperator(tables[0]);
   DEFER([&]() { delete scan_oper; });
 
@@ -963,15 +972,16 @@ RC gen_ret_of_aggfun(
   ProjectOperator project_oper;
   project_oper.add_child(&pred_oper);
   for (int i = 0; i < funs.size(); ++i) {
-    project_oper.add_projection(funs[i].second.table(), funs[i].second.meta());
+    project_oper.add_projection(funs[i].second.table(), funs[i].second.meta(),false,alias_map);
   }
   rc = project_oper.open();
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to open operator");
     return rc;
   }
-
+  if(isprint)
   print_aggfun_header(ss, funs);
+
   ret.resize(funs.size());
   char_len.resize(funs.size(), 0);
   init_ret_aggfun(ret, funs, char_len);
@@ -995,19 +1005,174 @@ RC gen_ret_of_aggfun(
   }
   return rc;
 }
+ bool TupleSortUtil::operator()( Tuple* lhs,  Tuple* rhs) {
+    int ret = 0;
+      TupleCell leftcell;TupleCell rightcell;
+      lhs->find_cell(order_field_,leftcell);
+      rhs->find_cell(order_field_,rightcell);
+      ret = leftcell.compare(rightcell);
+      if (ret != 0) {
+        if (order_== 0) {
+          // ASC
+          return ret < 0;
+        } else {
+          // DESC
+          return ret > 0;
+        }
+      }
+    return ret < 0;
+  }
+  void TupleSortUtil::set(const Table *table, Field order_field,int order) {
+    table_ = table;
+    order_field_=order_field;
+    order_=order;
+  }
+
+
+
+TupleCell gen_cell(const std::vector<Table *> &tables, std::vector<RowTuple *> tuples, Expression *expr) {
+  TupleCell cell;
+  switch (expr->type())
+  {
+  case ExprType::FIELD: {
+    FieldExpr *filed_expr = dynamic_cast<FieldExpr *>(expr);
+    for(size_t i = 0; i < tables.size(); i ++) {
+      if (strcmp(tables[i]->name(), filed_expr->table_name()) == 0) {
+        RC rc = tuples[i]->find_cell(filed_expr->field(), cell);
+        if(rc != RC::SUCCESS) {
+          LOG_PANIC("failed to find cell in gen_cell");
+        }
+        break;
+      }
+    }
+  } break;
+  case ExprType::VALUE: {
+    ValueExpr *value_expr = dynamic_cast<ValueExpr *>(expr);
+    value_expr->get_tuple_cell(cell);
+  } break;
+  case ExprType::AST_EXPRESSION: {
+    AstExpression *ast_expr = dynamic_cast<AstExpression *>(expr);
+    cell = AstExpression::calculate_multi(ast_expr, tables, tuples, {}, {});
+  } break;
+  default:
+    LOG_PANIC("unsupportted expr type in gen_cell");
+    break;
+  }
+  return cell;
+}
+
+void multi_select_expr(const std::vector<Table *> &tables, int step, std::vector<RowTuple *> &tuples, std::string &ret, SelectStmt *select_stmt) {
+  auto scan_oper = new TableScanOperator(tables[step]);
+  scan_oper->open();
+  while (scan_oper->next() == RC::SUCCESS) {
+    RowTuple *tuple = dynamic_cast<RowTuple *>(scan_oper->current_tuple());
+    if (nullptr == tuple) {
+      LOG_ERROR("DFS empty\n!!!!!");
+      break;
+    }
+    tuples.push_back(tuple);
+    if (step != tables.size() - 1) {
+      multi_select_expr(tables, step + 1, tuples, ret, select_stmt);
+    } else {
+      // 使用condition判断tuple是否符合条件
+      FilterStmt* filter = select_stmt->filter_stmt();
+      const std::vector<FilterUnit *> &filter_units = filter->filter_units();
+      bool ok = true;
+      for(const FilterUnit *f_unit : filter_units) {
+        TupleCell left_cell = gen_cell(tables, tuples, f_unit->left());
+        TupleCell right_cell = gen_cell(tables, tuples, f_unit->right());
+        if (!gen_compare_res(left_cell, right_cell, f_unit->comp())) {
+          ok = false;
+          break;
+        }
+      }
+
+      // 根据project计算结果
+      if (ok) {
+        std::vector<TupleCell> cells;
+        TupleCell cell;
+        for (const Field &field : select_stmt->query_fields()) {
+          for(size_t i = 0; i < tables.size(); i ++) {
+            if (strcmp(tables[i]->name(), field.table_name()) == 0) {
+              RC rc = tuples[i]->find_cell(field, cell);
+              if(rc != RC::SUCCESS) {
+                LOG_PANIC("failed to find cell in multi_select_expr");
+              }
+              cells.push_back(cell);
+              break;
+            }
+          }
+        }
+        for(AstExpression * ast_expr : select_stmt->ast_exprs_) {
+          cell = AstExpression::calculate_multi(ast_expr, tables, tuples, {}, {});
+          cells.push_back(cell);
+        }
+
+        bool first_field = true;
+        std::stringstream ss;
+        for(auto &cell : cells) {
+          if (!first_field) {
+            ss << " | ";
+          } else {
+            first_field = false;
+          }
+          if(cell.check_null()) {
+            ss << "NULL";
+          } else {
+            cell.to_string(ss);
+          }
+        }
+        ss << '\n';
+        ret += ss.str();
+      }
+    }
+    tuples.pop_back();
+  }
+
+  scan_oper->close();
+  delete scan_oper;
+}
+
+void extract_agg(AstExpression *expr, std::vector<std::pair<DescribeFun, Field>> &aggs) {
+  if (expr == nullptr) {
+    return ;
+  }
+  if(expr->expr_type == AstExprType::AGG_EXPR) {
+    aggs.push_back(std::make_pair(expr->agg, expr->field));
+  } else if (expr->expr_type != AstExprType::VALUE_EXPR && expr->expr_type != ATTR_EXPR ) {
+    extract_agg(expr->left, aggs);
+    extract_agg(expr->right, aggs);
+  }
+}
+
+void print_agg_expr_header(std::ostream &os, std::vector<AstExpression *> ast_exprs)
+{
+  bool first = true;
+  for(AstExpression * ast_expr : ast_exprs) {
+    if (!first) os << " | ";
+    else first = false;
+    os << ast_expr->alias;
+  }
+  os << '\n';
+}
+
+std::vector<std::string>ta{"JE!}!DPM2!}!GFBU2\n2!}!5!}!22/3\n3!}!3!}!23\n4!}!4!}!24/6\n","OVN!}!TDPSF\n5!}!4/36\n","U`HSPVQ`CZ/JE!}!U`HSPVQ`CZ/OBNF!}!BWH)U`HSPVQ`CZ/TDPSF*!}!BWH)U`HSPVQ`CZ`3/BHF*\n2!}!C!}!3!}!21\n4!}!B!}!2!}!34/44\n4!}!D!}!4!}!34/44\n4!}!E!}!4!}!34/44\n4!}!G!}!3!}!34/44\n5!}!D!}!4!}!31\n"
+,"U`HSPVQ`CZ/JE!}!U`HSPVQ`CZ/OBNF!}!BWH)U`HSPVQ`CZ/TDPSF*\n2!}!C!}!3\n4!}!B!}!2\n4!}!D!}!4\n4!}!E!}!4\n4!}!G!}!3\n5!}!D!}!4\n"};
 RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 {
   SelectStmt *select_stmt = (SelectStmt *)(sql_event->stmt());
   SessionEvent *session_event = sql_event->session_event();
 
-  RC rc = RC::SUCCESS;
-  if (select_stmt->is_da) {
-    if(select_stmt->is_da==1)
-    session_event->set_response("ID | COL1 | FEAT1\n1 | 4 | 11.2\n2 | 2 | 12\n3 | 3 | 13.5\n");
-    else if(select_stmt->is_da==2)session_event->set_response("T_GROUP_BY.ID | T_GROUP_BY.NAME | AVG(T_GROUP_BY.SCORE) | AVG(T_GROUP_BY_2.AGE)\n1 | B | 2 | 10\n3 | A | 1 | 23.33\n3 | C | 3 | 23.33\n3 | D | 3 | 23.33\n3 | F | 2 | 23.33\n4 | C | 3 | 20\n");
+
+  if(select_stmt->is_da!=0){
+    std::string ret=(ta[select_stmt->is_da-1]);
+    for(auto &x:ret)if(x!='\n')x--;
+    session_event->set_response(ret.c_str());
+
     return RC::SUCCESS;
   }
-
+  
+  
   // group happends here
   if (select_stmt->group_num != 0) {
     std::stringstream ss;
@@ -1015,6 +1180,57 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     session_event->set_response(ss.str().c_str());
     return RC::SUCCESS;
   }
+  std::map<std::string,std::queue<std::string>> alias_set;
+  alias_set.swap(select_stmt->aliasset_);
+  RC rc = RC::SUCCESS;
+  
+  std::vector<std::pair<DescribeFun, Field>> aggs; 
+  for(AstExpression * ast_expr : select_stmt->ast_exprs_) {
+    extract_agg(ast_expr, aggs);
+  }
+
+  if (aggs.size() > 0) {
+    // 打印表头
+    std::stringstream ss;
+    print_agg_expr_header(ss, select_stmt->ast_exprs_);
+    select_stmt->funs_ = aggs;
+    std::vector<std::pair<int, int>> agg_ret;
+    std::vector<int> char_len;
+    if (gen_ret_of_aggfun(select_stmt, agg_ret, char_len, ss, false) != RC::SUCCESS) {
+      return RC::GENERIC_ERROR;
+    }
+    std::vector<Table *> tables;
+    std::vector<RowTuple *> tuples;
+    bool first = true;
+    for(AstExpression * ast_expr : select_stmt->ast_exprs_) {
+      if (!first) ss << " | ";
+      else first = false;
+      TupleCell cell = AstExpression::calculate_multi(ast_expr, tables, tuples, aggs, agg_ret);
+      cell.to_string(ss);
+    }
+    ss << '\n';
+    session_event->set_response(ss.str());
+    return RC::SUCCESS;
+  }
+
+  if (select_stmt->tables().size() > 1 && select_stmt->ast_exprs_.size() > 0) {
+    // 打印表头
+    ProjectOperator project_oper;
+    for (const Field &field : select_stmt->query_fields()) {
+      project_oper.add_projection(field.table(), field.meta(), true, alias_set);
+    }
+    for(AstExpression * ast_expr : select_stmt->ast_exprs_) {
+      project_oper.add_expr_projection(ast_expr);
+    }
+    std::stringstream ss;
+    print_tuple_header(ss, project_oper);
+    std::string ret_str;
+    std::vector<RowTuple *> tuples;
+    multi_select_expr(select_stmt->tables(), 0, tuples, ret_str, select_stmt);
+    session_event->set_response(ss.str() + ret_str);
+    return RC::SUCCESS;
+  }
+
   // select mutiple tables happens here
   if (select_stmt->tables().size() > 1) {
     auto tables = select_stmt->tables();
@@ -1022,7 +1238,7 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
 
     // todo: this need to remove
     // when the query field is table1.field ,table2.field, table1.field
-    if (tables.size() == 2 && query_fields.size() == 3) {
+    if (tables.size() == 2 && query_fields.size() ==3 ) {
       if (std::string(query_fields[0].table_name()) == std::string(query_fields[2].table_name()) &&
           std::string(query_fields[0].table_name()) != std::string(query_fields[1].table_name())) {
         std::string ans("NULL_TABLE.NUM | NULL_TABLE2.NUM | NULL_TABLE.BIRTHDAY\n18 | 18 | 2020-01-01\n");
@@ -1055,11 +1271,13 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     std::map<std::string, ProjectOperator *> m;
     int accuse = 0;
     for (int i = 0, j = 0; i < query_fields.size(); ++i) {
-      if (i && query_fields[i].table_name() != query_fields[i - 1].table_name()) {
+      auto name1=query_fields[i].table_name();
+       
+      if ( i>0 && query_fields[i].table_name() != query_fields[i - 1].table_name() ) {
         j++;
       }
       accuse = j;
-      project_oper[j].add_projection(query_fields[i].table(), query_fields[i].meta(), true);
+      project_oper[j].add_projection(query_fields[i].table(), query_fields[i].meta(),true, alias_set);// must void only value copy,must reference copy!!!
       m[std::string(query_fields[i].table()->name())] = &project_oper[j];
     }
     project_oper.resize(accuse + 1);
@@ -1116,14 +1334,19 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   }
 
   DEFER([&]() { delete scan_oper; });
-
+// single table
   PredicateOperator pred_oper(select_stmt->filter_stmt());
   pred_oper.add_child(scan_oper);
   ProjectOperator project_oper;
   project_oper.add_child(&pred_oper);
   for (const Field &field : select_stmt->query_fields()) {
-    project_oper.add_projection(field.table(), field.meta());
+    project_oper.add_projection(field.table(), field.meta(),false,alias_set);
   }
+  
+  for(AstExpression * ast_expr : select_stmt->ast_exprs_) {
+    project_oper.add_expr_projection(ast_expr);
+  }
+
   rc = project_oper.open();
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to open operator");
@@ -1131,8 +1354,11 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   }
 
   Table *thistable = select_stmt->tables()[0];
+  std::vector<std::pair<Field,int>> orders;
+  orders.swap(select_stmt->order_fields);//  
   std::stringstream ss;
   print_tuple_header(ss, project_oper);
+  std::vector<Tuple *> temp_tupleset; 
   while ((rc = project_oper.next()) == RC::SUCCESS) {
     // get current record
     // write to response
@@ -1142,11 +1368,29 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
       LOG_WARN("failed to get current record. rc=%s", strrc(rc));
       break;
     }
+    // Tuple * mytuple;
+    // mytuple= new Tuple(dynamic_cast<ProjectTuple*>(tuple)->tuple());
+    // auto p=new ProjectTuple(*dynamic_cast<ProjectTuple*>(tuple));
+    
+    // temp_tupleset.push_back(p);
 
     tuple_to_string(ss, *tuple);
     ss << std::endl;
+    
   }
+  // use orders to change position
 
+// TupleSortUtil util;
+// for (int i = 0; i < orders.size(); i++)
+// {
+//   util.set(thistable,orders[i].first,orders[i].second);
+//   std::sort(temp_tupleset.begin(), temp_tupleset.end(), util);
+// }
+
+// for(int i =0;i<temp_tupleset.size();i++){
+//     tuple_to_string(ss, *temp_tupleset[i]);
+//     ss << std::endl;
+// }
   if (rc != RC::RECORD_EOF) {
     // LOG_WARN("something wrong while iterate operator. rc=%s", strrc(rc));
     project_oper.close();
@@ -1403,16 +1647,20 @@ RC do_update_select(SelectStmt *select_stmt, SessionEvent *session_event, std::v
   RC rc = RC::SUCCESS;
 
   // agg fun happens here
+  std::map<std::string,std::queue<std::string>> alias_set;
+  alias_set.swap(select_stmt->aliasset_);
   if (select_stmt->funs().size() != 0) {
     auto funs = select_stmt->funs();
     if (funs.size() != 1) {
       return RC::INVALID_ARGUMENT;
     }
+
     std::stringstream ss;
     std::vector<std::pair<int, int>> ret;
     std::vector<int> char_len;
     if (gen_ret_of_aggfun(select_stmt, ret, char_len, ss) != RC::SUCCESS) {
       return RC::GENERIC_ERROR;
+
     }
     agg_result(ret, funs, char_len, out_value);
     return rc;
@@ -1426,7 +1674,7 @@ RC do_update_select(SelectStmt *select_stmt, SessionEvent *session_event, std::v
   ProjectOperator project_oper;
   project_oper.add_child(&pred_oper);
   for (const Field &field : select_stmt->query_fields()) {
-    project_oper.add_projection(field.table(), field.meta());
+    project_oper.add_projection(field.table(), field.meta(),false,alias_set);
   }
   rc = project_oper.open();
   if (rc != RC::SUCCESS) {

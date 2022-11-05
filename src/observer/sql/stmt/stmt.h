@@ -16,7 +16,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "rc.h"
 #include "sql/parser/parse_defs.h"
-
+#include "queue"
 class Db;
 
 enum class StmtType

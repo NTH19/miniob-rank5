@@ -22,8 +22,14 @@ RC parse(char *st, Query *sqln);
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
+void selects_append_order(Selects *selects, RelAttr *rel_attr, int order) {
+  selects->order_by[selects->order_num].attribute = *rel_attr;
+  selects->order_by[selects->order_num].order = order;
+  selects->order_num++;
+}
 void relation_attr_init(RelAttr *relation_attr, const char *relation_name, const char *attribute_name)
 {
+  
   if (relation_name != nullptr) {
     relation_attr->relation_name = strdup(relation_name);
   } else {
@@ -39,6 +45,26 @@ void relation_attr_destroy(RelAttr *relation_attr)
   relation_attr->relation_name = nullptr;
   relation_attr->attribute_name = nullptr;
 }
+
+void value_init_astexpr(AstExpr *expr, Value *value) {
+  if (expr->type == VALUE_EXPR) {
+    *value = expr->value;
+  } else if (expr->type == SUB_OP && expr->right->type == VALUE_EXPR) {
+    *value = expr->right->value;
+    if(value->type == INTS) {
+      int val = *(int *)value->data;
+      *(int *)value->data = -val;
+    } else if (value->type == FLOATS) {
+      float val = *(float *)value->data;
+      *(float *)value->data = -val;
+    } else {
+      LOG_PANIC("invalid expr 1");
+    }
+  } else {
+    LOG_PANIC("invalid expr 2");
+  }
+}
+
 void value_init_null(Value *value) {
   value->data = nullptr;
   value->type = UNDEFINED;
@@ -48,12 +74,14 @@ void value_init_integer(Value *value, int v)
 {
   value->type = INTS;
   value->data = malloc(sizeof(v));
+  value->_is_null = 0;
   memcpy(value->data, &v, sizeof(v));
 }
 void value_init_float(Value *value, float v)
 {
   value->type = FLOATS;
   value->data = malloc(sizeof(v));
+  value->_is_null = 0;
   memcpy(value->data, &v, sizeof(v));
 }
 
@@ -61,6 +89,7 @@ void value_init_string(Value *value, const char *v)
 {
   value->type = CHARS;
   value->data = strdup(v);
+  value->_is_null=0;
 }
 
 int value_init_date(Value* value, const char* v) {
@@ -71,6 +100,7 @@ int value_init_date(Value* value, const char* v) {
     if(!b) return -1;
     int dv = y*10000+m*100+d;
     value->data = malloc(sizeof(dv));//TODO:check malloc failure
+    value->_is_null = 0;
     memcpy(value->data, &dv, sizeof(dv));
     return 0;
 }
@@ -96,6 +126,8 @@ void condition_init_with_two_query(Condition *condition,CompOp comp,Selects *l,S
   condition->right_type=SEL;
   condition->sel[0]=l;
   condition->sel[1]=r;
+  condition->left_expr = nullptr;
+  condition->right_expr = nullptr;
 }
 void condition_init_with_query(Condition *condition, CompOp comp, RelAttr *left_attr,Selects *p){
   condition->comp=comp;
@@ -109,6 +141,8 @@ void condition_init_with_query(Condition *condition, CompOp comp, RelAttr *left_
   condition->right_type=SEL;
   condition->sel[1]=p;
   condition->sel[0]=nullptr;
+  condition->left_expr = nullptr;
+  condition->right_expr = nullptr;
 }
 void condition_init(Condition *condition, CompOp comp, int left_is_attr, RelAttr *left_attr, Value *left_value,
     int right_is_attr, RelAttr *right_attr, Value *right_value)
@@ -132,7 +166,40 @@ void condition_init(Condition *condition, CompOp comp, int left_is_attr, RelAttr
   }
   condition->sel[0]=nullptr;
   condition->sel[1]=nullptr;
+  condition->left_expr = nullptr;
+  condition->right_expr = nullptr;
 }
+
+void condition_init_from_expr(Condition *condition, CompOp comp, AstExpr *left, AstExpr *right) {
+  condition->comp = comp;
+  condition->value_num = 0;
+  condition->left_expr = nullptr;
+  condition->right_expr = nullptr;
+  condition->sel[0]=nullptr;
+  condition->sel[1]=nullptr;
+  if (left->type == AstExprType::VALUE_EXPR) {
+    condition->left_value = left->value;
+    condition->left_type = VALUE;
+  } else if (left->type == AstExprType::ATTR_EXPR) {
+    condition->left_attr = left->attr;
+    condition->left_type = ATTR;
+  } else {
+    condition->left_expr = left;
+    condition->left_type = AST_EXPR;
+  }
+
+  if (right->type == AstExprType::VALUE_EXPR) {
+    condition->right_value = right->value;
+    condition->right_type = VALUE;
+  } else if (right->type == AstExprType::ATTR_EXPR) {
+    condition->right_attr = right->attr;
+    condition->right_type = ATTR;
+  } else {
+    condition->right_expr = right;
+    condition->right_type = AST_EXPR;
+  }
+}
+
 void condition_destroy(Condition *condition)
 {
   // if (condition->left_is_attr) {
@@ -162,18 +229,39 @@ void attr_info_destroy(AttrInfo *attr_info)
   attr_info->_nullable = 0;
 }
 
-void selects_init(Selects *selects, ...);
+void selects_init(Selects *selects) {
+  selects->attr_num = 0;
+  selects->aggfun_num = 0;
+  selects->relation_num = 0;
+  selects->expr_num = 0;
+  selects->sub_query_num = 0;
+  selects->alias_num = 0;
+  selects->condition_num = 0;
+  selects->order_num = 0;
+}
+
 void selects_append_attribute(Selects *selects, RelAttr *rel_attr)
 {
   selects->attributes[selects->attr_num++] = *rel_attr;
 }
-void condition_init_cells_for_in(Condition*c, RelAttr *left_attr,Value values[], size_t value_num,CompOp cmp)
+
+void selects_reverse_append_attribute(Selects *selects, RelAttr *rel_attr) {
+  for(size_t i = selects->attr_num; i > 0; i -- ) {
+    selects->attributes[i] = selects->attributes[i - 1];
+  }
+  selects->attributes[0] = *rel_attr;
+  selects->attr_num++;
+}
+
+void condition_init_cells_for_in(Condition *c, RelAttr *left_attr,Value values[], size_t value_num,CompOp cmp)
 {
   c->left_type = ATTR;
   c->left_attr = *left_attr;
   c->value_num=value_num;
   c->right_type=CELLS;
   c->comp=cmp;
+  c->left_expr = nullptr;
+  c->right_expr = nullptr;
   for(int i=0;i<value_num;++i){
     c->values[i]=values[i];
   }
@@ -189,16 +277,54 @@ void selects_append_aggfun(Selects *selects, AggFun * a)
 {
   selects->aggFun[selects->aggfun_num++]=*a;
 }
+
+void selects_reverse_append_aggfun(Selects *selects, AggFun * a) {
+  for(size_t i = selects->aggfun_num; i > 0; i --) {
+    selects->aggFun[i] = selects->aggFun[i - 1];
+  }
+  selects->aggFun[0] = *a;
+  selects->aggfun_num++;
+}
+
+void selects_append_alias2(Selects *selects, const char *relation_name,const char * attr_name,const char* alias)
+{
+  selects->real_name[selects->alias_num]=strdup((new std::string(relation_name))->append(".").append(attr_name).c_str());
+  selects->alias_name[selects->alias_num]=strdup(alias);
+  selects->alias_num++;
+}
+void selects_append_alias3(Selects *selects, AggFun * a,const char* alias)
+{
+  char* i=(char*)&(a->des);
+  if (a->attr.relation_name) selects->real_name[selects->alias_num]=strdup((new std::string(a->attr.relation_name))->append(".").append(a->attr.attribute_name).c_str());
+  else selects->real_name[selects->alias_num]=strdup((new std::string(i))->append(".").append(a->attr.attribute_name).c_str());
+  selects->alias_name[selects->alias_num]=strdup(alias);
+  selects->alias_num++;
+  a->alias_name= strdup(alias);
+}
+void selects_append_alias(Selects *selects, const char * name,const char* alias)
+{
+  selects->real_name[selects->alias_num]=strdup(name);
+  selects->alias_name[selects->alias_num]=strdup(alias);
+  selects->alias_num++;
+}
 void Init_AggFun(AggFun * a, DescribeFun des, const char* arr_name){
   a->attr.attribute_name = strdup(arr_name);
   a->des = des;
   a->attr.relation_name=nullptr;
+  a->alias_name=nullptr;
 }
+void Init_AggFun1(AggFun * a, DescribeFun des, const char* arr_name,const char * alias_name){
+  a->attr.attribute_name = strdup(arr_name);
+  a->des = des;
+  a->attr.relation_name=nullptr;
+  a->alias_name=strdup(alias_name);
 
+}
 void Init_AggFun_Rel(AggFun *a, DescribeFun des, const char* rel_name, const char* arr_name) {
   a->attr.relation_name = strdup(rel_name);
   a->attr.attribute_name = strdup(arr_name);
   a->des = des;
+  a->alias_name=nullptr;
 }
 
 void selects_append_conditions(Selects *selects, Condition conditions[], size_t condition_num)
@@ -209,6 +335,7 @@ void selects_append_conditions(Selects *selects, Condition conditions[], size_t 
   }
   selects->condition_num = condition_num;
 }
+
 void selects_append_conditions_start(Selects *selects, Condition conditions[], size_t start,size_t end)
 {
   assert(end-start <= sizeof(selects->conditions) / sizeof(selects->conditions[0]));
@@ -217,6 +344,27 @@ void selects_append_conditions_start(Selects *selects, Condition conditions[], s
   }
   selects->condition_num = end-start;
 }
+
+void selects_append_expr(Selects *selects, AstExpr *expr) {
+  switch (expr->type)
+  {
+  case AstExprType::ATTR_EXPR:
+    if (expr->need_append) {
+      selects_append_attribute(selects, &expr->attr);
+    }
+    break; 
+  case AstExprType::AGG_EXPR:
+    if (expr->need_append) {
+      selects_append_aggfun(selects, &expr->agg);
+    }
+    break;
+  default:
+    selects->attr_expr[selects->expr_num++] = *expr;
+    break;
+  }
+  // TODO: free(expr);
+}
+
 void selects_destroy(Selects *selects)
 {
   for (size_t i = 0; i < selects->attr_num; i++) {
@@ -239,6 +387,17 @@ void selects_destroy(Selects *selects)
     relation_attr_destroy(&selects->aggFun[i].attr);
   }
   selects->aggfun_num = 0;
+  for(size_t i = 0; i < selects->alias_num; i++) {
+    free(selects->alias_name[i]);
+    free(selects->real_name[i]);
+    selects->alias_name[i]=NULL;
+    selects->real_name[i]=NULL;
+  }
+  selects->alias_num = 0;
+  for (size_t i = 0; i < selects->order_num; i++) {
+    relation_attr_destroy(&selects->attributes[i]);
+  }
+  selects->order_num = 0;
 }
 
 void inserts_init(Inserts *inserts, const char *relation_name, Value values[], size_t value_num,size_t single_record_length[], size_t record_num)
@@ -459,6 +618,51 @@ void load_data_destroy(LoadData *load_data)
   free((char *)load_data->file_name);
   load_data->relation_name = nullptr;
   load_data->file_name = nullptr;
+}
+
+AstExpr *create_value_expr(Value *value) {
+  AstExpr *expr = (AstExpr *)malloc(sizeof(AstExpr));
+  expr->type = AstExprType::VALUE_EXPR;
+  expr->value = *value;
+  expr->left_brackets = 0;
+  expr->right_brackets = 0;
+  expr->left = nullptr;
+  expr->right = nullptr;
+  return expr;
+}
+
+AstExpr *create_attr_expr(RelAttr *attr, int need_append) {
+  AstExpr *expr = (AstExpr *)malloc(sizeof(AstExpr));
+  expr->type = AstExprType::ATTR_EXPR;
+  expr->left_brackets = 0;
+  expr->right_brackets = 0;
+  expr->attr = *attr;
+  expr->need_append = need_append;
+  expr->left = nullptr;
+  expr->right = nullptr;
+  return expr;
+}
+
+AstExpr *create_agg_expr(AggFun *agg, int need_append) {
+  AstExpr *expr = (AstExpr *)malloc(sizeof(AstExpr));
+  expr->type = AstExprType::AGG_EXPR;
+  expr->agg = *agg;
+  expr->left_brackets = 0;
+  expr->right_brackets = 0;
+  expr->need_append = need_append;
+  expr->left = nullptr;
+  expr->right = nullptr;
+  return expr;
+}
+
+AstExpr *create_astexpr(AstExprType type, AstExpr *left, AstExpr *right) {
+  AstExpr *expr = (AstExpr *)malloc(sizeof(AstExpr));
+  expr->type = type;
+  expr->left_brackets = 0;
+  expr->right_brackets = 0;
+  expr->left = left;
+  expr->right = right;
+  return expr;
 }
 
 void query_init(Query *query)
