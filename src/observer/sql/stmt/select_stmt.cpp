@@ -48,12 +48,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
     return RC::INVALID_ARGUMENT;
   }
 
-  if(select_sql.is_da && select_sql.is_da!=2){
-    auto p= new SelectStmt;
-    p->flag_=select_sql.is_da;
-    stmt=p;
-    return RC::SUCCESS;
-  }
+
   hav_con* hav_ptr=nullptr;
   std::map<std::string, std::queue<std::string>> alias_name_map;
   std::map<std::string, std::queue<std::string>> name_alias_map;
@@ -75,12 +70,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
     }
 
   }
-  if(select_sql.is_or){
-    auto p=new SelectStmt;
-    p->flag_=1;
-    stmt=p;
-    return RC::SUCCESS;
-  }
+
   // collect tables in `from` statement
   std::vector<Table *> tables;
   std::unordered_map<std::string, Table *> table_map;
@@ -347,7 +337,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
   select_stmt->order_fields_.swap(order_fields);
   stmt = select_stmt;
 
-  select_stmt->flag_=select_sql.is_da;
+  select_stmt->flag_=0;
   select_stmt->head=p;
   select_stmt->group_num=select_sql.group_num;
 

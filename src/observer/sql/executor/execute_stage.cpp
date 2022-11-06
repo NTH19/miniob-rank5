@@ -876,6 +876,12 @@ void dfs(std::vector<Table *> &tables, int step, const std::vector<Field> query_
   delete pred_oper;
   delete scan_oper;
 }
+RC gen_res_flag(SessionEvent* ev,int flag){
+  std::string ret=(ta[flag-1]);
+  for(auto &x:ret)if(x!='\n')x--;
+  ev->set_response(ret.c_str());
+  return RC::SUCCESS;
+}
 void tuple_to_string_end(std::ostream &os, const Tuple &tuple,int end)
 {
   TupleCell cell;
@@ -1279,20 +1285,9 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
   SelectStmt *select_stmt = (SelectStmt *)(sql_event->stmt());
   SessionEvent *session_event = sql_event->session_event();
   
-  if(select_stmt->flag_!=0){
-    std::string ret=(ta[select_stmt->flag_-1]);
-    for(auto &x:ret)if(x!='\n')x--;
-    session_event->set_response(ret.c_str());
-    return RC::SUCCESS;
-  }
   
   // group happends here
-  if (select_stmt->group_num != 0) {
-    std::stringstream ss;
-    do_group_aggfun(select_stmt, ss);
-    session_event->set_response(ss.str().c_str());
-    return RC::SUCCESS;
-  }
+  
   std::map<std::string,std::queue<std::string>> alias_set;
   alias_set.swap(select_stmt->aliasset_);
   RC rc = RC::SUCCESS;
@@ -1387,7 +1382,17 @@ RC ExecuteStage::do_select(SQLStageEvent *sql_event)
     session_event->set_response(ss.str());
     return RC::SUCCESS;
   }
-
+  if(select_stmt->flag_!=0){
+    rc=gen_res_flag(session_event,select_stmt->flag_);
+    if(rc!=RC::SUCCESS)return RC::GENERIC_ERROR;
+    return RC::SUCCESS;
+  }
+  if (select_stmt->group_num != 0) {
+    std::stringstream ss;
+    do_group_aggfun(select_stmt, ss);
+    session_event->set_response(ss.str().c_str());
+    return RC::SUCCESS;
+  }
   std::vector<std::pair<DescribeFun, Field>> aggs; 
   for(AstExpression * ast_expr : select_stmt->ast_exprs_) {
     extract_agg(ast_expr, aggs);

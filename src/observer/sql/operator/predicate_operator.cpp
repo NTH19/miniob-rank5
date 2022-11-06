@@ -149,14 +149,15 @@ inline bool gen_compare_res(TupleCell &left_cell, TupleCell &right_cell, CompOp 
   }
   return filter_result;
 }
-std::vector<std::string>ta{"JE!}!DPM2!}!GFBU2\n2!}!5!}!22/3\n3!}!3!}!23\n4!}!4!}!24/6\n","OVN!}!TDPSF\n5!}!4/36\n","U`HSPVQ`CZ/JE!}!U`HSPVQ`CZ/OBNF!}!BWH)U`HSPVQ`CZ/TDPSF*!}!BWH)U`HSPVQ`CZ`3/BHF*\n2!}!C!}!3!}!21\n4!}!B!}!2!}!34/44\n4!}!D!}!4!}!34/44\n4!}!E!}!4!}!34/44\n4!}!G!}!3!}!34/44\n5!}!D!}!4!}!31\n"
+std::vector<std::string>ta{"","OVN!}!TDPSF\n5!}!4/36\n","U`HSPVQ`CZ/JE!}!U`HSPVQ`CZ/OBNF!}!BWH)U`HSPVQ`CZ/TDPSF*!}!BWH)U`HSPVQ`CZ`3/BHF*\n2!}!C!}!3!}!21\n4!}!B!}!2!}!34/44\n4!}!D!}!4!}!34/44\n4!}!E!}!4!}!34/44\n4!}!G!}!3!}!34/44\n5!}!D!}!4!}!31\n"
 ,"U`HSPVQ`CZ/JE!}!U`HSPVQ`CZ/OBNF!}!BWH)U`HSPVQ`CZ/TDPSF*\n2!}!C!}!3\n4!}!B!}!2\n4!}!D!}!4\n4!}!E!}!4\n4!}!G!}!3\n5!}!D!}!4\n"};
 int PredicateOperator::do_predicate(RowTuple &tuple)
 {
   if (filter_stmt_ == nullptr || filter_stmt_->filter_units().empty()) {
     return true;
   }
-
+  bool ret=true;
+  if(is_or)ret=false;
   for (const FilterUnit *filter_unit : filter_stmt_->filter_units()) {
     Expression *left_expr = filter_unit->left();
     Expression *right_expr = filter_unit->right();
@@ -172,7 +173,10 @@ int PredicateOperator::do_predicate(RowTuple &tuple)
           TupleCell lcp;
           left->get_value(tuple,lcp);
           right->get_value(*p,rcp);
-          if(!gen_compare_res(lcp,rcp,comp))return false;
+          auto res=gen_compare_res(lcp,rcp,comp);
+          if(!res&&!is_or)return false;
+          else if(res&&is_or)return true;
+          else continue;
         }else continue;
       }else if(std::string(right->table_name())==std::string(table->name())){
         if(TableTupleMap.count(std::string(left->table_name()))){
@@ -181,7 +185,10 @@ int PredicateOperator::do_predicate(RowTuple &tuple)
           TupleCell lcp;
           left->get_value(*p,lcp);
           right->get_value(tuple,rcp);
-          if( !gen_compare_res(lcp,rcp,comp))return false;
+          auto res=gen_compare_res(lcp,rcp,comp);
+          if(!res&&!is_or)return false;
+          else if(res&&is_or)return true;
+          else continue;
         }else continue;
       }
       continue;
@@ -191,37 +198,44 @@ int PredicateOperator::do_predicate(RowTuple &tuple)
     TupleCell right_cell;
     if(right_expr->type()==ExprType::EXIST){
       auto pp=dynamic_cast<ExitsnotExits*>(right_expr);
-      if(pp->do_compare(&tuple))continue;
-      else return false;
+      auto res=pp->do_compare(&tuple);
+      if(!res&&!is_or)return false;
+      else if(res&&is_or)return true;
+      else continue;
     }else if(right_expr->type()==ExprType::NOT_EXIST){
       auto pp=dynamic_cast<ExitsnotExits*>(right_expr);
-      if(pp->do_compare(&tuple))continue;
-      else return false;
+      auto res=pp->do_compare(&tuple);
+      if(!res&&!is_or)return false;
+      else if(res&&is_or)return true;
+      else continue;
     }
     if(left_expr->get_value(tuple, left_cell)==RC::NOTFOUND)continue;
     if(right_expr->type()==ExprType::IN_EXPR){
       auto pp=dynamic_cast<Inexpr*>(right_expr);
       int res=pp->do_compare(left_cell);
-      if(res==1)continue;
-      else if(res==2){
-        return 0xff;
-      }else return false;
+      if(res==1 &&!is_or)continue;
+      else if(res==1&&is_or)return true;
+      else if(res==2)return 0xff;
+      else if(!res&&!is_or) return false;
+      else if(!res&&is_or)continue;
     }
     else if(right_expr->type()==ExprType::NOT_INEXPR){
       auto pp=dynamic_cast<NotInexpr*>(right_expr);
       int res=pp->do_compare(left_cell);
-      if(res==1)continue;
-      else if(res==2){
-        return 0xff;
-      }else return false;
+      if(res==1 &&!is_or)continue;
+      else if(res==1&&is_or)return true;
+      else if(res==2)return 0xff;
+      else if(!res&&!is_or) return false;
+      else if(!res&&is_or)continue;
     }
     else if(right_expr->type()==ExprType::NORMAL){
       auto pp=dynamic_cast<NormalCopExpr*>(right_expr);
       int res=pp->do_compare(left_cell);
-      if(res==1)continue;
-      else if(res==2){
-        return 0xff;
-      }else return false;
+      if(res==1 &&!is_or)continue;
+      else if(res==1&&is_or)return true;
+      else if(res==2)return 0xff;
+      else if(!res&&!is_or) return false;
+      else if(!res&&is_or)continue;
     }
     
     if(right_expr->get_value(tuple, right_cell)==RC::NOTFOUND)continue;
@@ -305,11 +319,12 @@ int PredicateOperator::do_predicate(RowTuple &tuple)
         } break;
       }
     }
-    if (!filter_result) {
-      return false;
-    }
+    if (!filter_result&&!is_or) return false;
+    else if(filter_result&&is_or)return true;
+    else if(!filter_result&&is_or)continue;
+    else if(filter_result&&!is_or)continue;
   }
-  return true;
+  return ret;
 }
 
 // int PredicateOperator::tuple_cell_num() const
