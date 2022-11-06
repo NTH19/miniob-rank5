@@ -116,7 +116,7 @@ void yyerror(yyscan_t scanner, const char *str)
   context->condition_length = 0;
   context->from_length = 0;
   context->select_length = 0;
-  context->ssql->sstr.selection.flag_=0;
+
   context->value_length = 0;
   context->ssql->sstr.selection.sub_query_num=0;
   context->ssql->sstr.insertion.value_num = 0;

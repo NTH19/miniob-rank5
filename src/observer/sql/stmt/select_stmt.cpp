@@ -70,6 +70,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
     }
 
   }
+
   // collect tables in `from` statement
   std::vector<Table *> tables;
   std::unordered_map<std::string, Table *> table_map;
@@ -336,7 +337,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
   select_stmt->order_fields_.swap(order_fields);
   stmt = select_stmt;
 
-  select_stmt->flag_=select_sql.flag_;
+  select_stmt->flag_=0;
   select_stmt->head=p;
   select_stmt->group_num=select_sql.group_num;
 
