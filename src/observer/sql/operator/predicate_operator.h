@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include "sql/operator/operator.h"
+#include "../stmt/filter_stmt.h"
 
 class FilterStmt;
 
@@ -27,7 +28,9 @@ class PredicateOperator : public Operator
 public:
   PredicateOperator(FilterStmt *filter_stmt)
     : filter_stmt_(filter_stmt)
-  {}
+  {
+    if(filter_stmt)is_or=filter_stmt->is_or;
+  }
 
   virtual ~PredicateOperator() = default;
 
@@ -36,12 +39,12 @@ public:
   RC close() override;
 
   Tuple * current_tuple() override;
-  bool is_or=false;
   //int tuple_cell_num() const override;
   //RC tuple_cell_spec_at(int index, TupleCellSpec &spec) const override;
 private:
   int do_predicate(RowTuple &tuple);
 private:
   FilterStmt *filter_stmt_ = nullptr;
+  bool is_or=false;
 };
 extern std::map<std::string,Tuple*>TableTupleMap;

@@ -166,7 +166,7 @@ struct _Selects{
   OrderBy   order_by[MAX_NUM];
   size_t ha_num;
   Condition hav_con[MAX_NUM];
-  int is_da;
+  int flag_;
   int group_num;
   RelAttr gruop_use[MAX_NUM];
   int is_or;
