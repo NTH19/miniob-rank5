@@ -22,14 +22,9 @@ RC parse(char *st, Query *sqln);
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
-void selects_append_order(Selects *selects, RelAttr *rel_attr, int order) {
-  selects->order_by[selects->order_num].attribute = *rel_attr;
-  selects->order_by[selects->order_num].order = order;
-  selects->order_num++;
-}
+
 void relation_attr_init(RelAttr *relation_attr, const char *relation_name, const char *attribute_name)
 {
-  
   if (relation_name != nullptr) {
     relation_attr->relation_name = strdup(relation_name);
   } else {
@@ -238,6 +233,12 @@ void selects_init(Selects *selects) {
   selects->alias_num = 0;
   selects->condition_num = 0;
   selects->order_num = 0;
+}
+
+void selects_append_order(Selects *selects, RelAttr *rel_attr, OrderType type) {
+  selects->order_by[selects->order_num].attribute = *rel_attr;
+  selects->order_by[selects->order_num].type = type;
+  selects->order_num++;
 }
 
 void selects_append_attribute(Selects *selects, RelAttr *rel_attr)

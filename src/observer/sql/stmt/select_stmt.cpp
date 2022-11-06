@@ -289,9 +289,9 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
     }
   }
 
-  // collect orderfields
-  std::vector<std::pair<Field, int>> order_fields;
-  for (int i = 0; i < select_sql.order_num; i++) {
+  // collect order fields
+  std::vector<std::pair<Field, OrderType>> order_fields;
+  for (size_t i = 0; i < select_sql.order_num; i++) {
     Table *table;
     const char *field_name;
     const RelAttr &relation_attr = select_sql.order_by[i].attribute;
@@ -305,6 +305,10 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
       }
       table = iter->second;
     } else {  // single table
+      if (tables.size() != 1) {
+        LOG_WARN("invalid. I do not know the attr's table. attr=%s", relation_attr.attribute_name);
+        return RC::SCHEMA_FIELD_MISSING;
+      }
       field_name = relation_attr.attribute_name;
       table = tables[0];
     }
@@ -313,8 +317,21 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
       LOG_WARN("no such field. field=%s.%s.%s", db->name(), table->name(), field_name);
       return RC::SCHEMA_FIELD_MISSING;
     }
-    order_fields.push_back(std::pair<Field, int>(Field(table, field_meta), select_sql.order_by[i].order));
-    // order_bys.push_back(select_sql.order_by[i]);
+
+    // check order field in query field
+    bool in_query = false;
+    for(Field &query_field : query_fields) {
+      if (strcmp(query_field.table_name(), table->name()) == 0 &&
+          strcmp(query_field.field_name(), field_name) == 0) {
+        in_query = true;
+        break; 
+      }
+    }
+    if (!in_query) {
+      LOG_WARN("no such order field in query field. field=%s.%s.%s", db->name(), table->name(), field_name);
+      return RC::SCHEMA_FIELD_MISSING;
+    }
+    order_fields.push_back(std::pair<Field, OrderType>(Field(table, field_meta), select_sql.order_by[i].type));
   }
 
   // everything alright
@@ -327,7 +344,7 @@ RC SelectStmt::create(Db *db, const Selects &select_sql, Stmt *&stmt, bool out,
   select_stmt->filter_stmt_ = filter_stmt;
   select_stmt->need_reverse = select_sql.need_Revere;
   select_stmt->aliasset_.swap(name_alias_map);
-  select_stmt->order_fields.swap(order_fields);
+  select_stmt->order_fields_.swap(order_fields);
   stmt = select_stmt;
 
   select_stmt->flag_=select_sql.is_da;

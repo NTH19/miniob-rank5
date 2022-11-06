@@ -64,12 +64,13 @@ public:
   Group_by* head=nullptr;
 
   std::map<std::string,std::queue<std::string>> aliasset_;
-  std::vector<std::pair<Field,int>>   order_fields;
+  std::vector<std::pair<Field, OrderType>> order_fields_;
   std::vector<AstExpression *> ast_exprs_;
   std::vector<std::pair<DescribeFun,Field>> funs_;
   hav_con* hav=nullptr;
-private:
   std::vector<Field> query_fields_;
+
+private:
   std::vector<Table *> tables_;
   FilterStmt *filter_stmt_ = nullptr;
 

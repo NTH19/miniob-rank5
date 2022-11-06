@@ -24,8 +24,7 @@ typedef struct ParserContext {
   size_t depth;
   DescribeFun des[MAX_NUM];
   CompOp comp;
-	char id[MAX_NUM];
-	int order; 
+  char id[MAX_NUM];
 } ParserContext;
 
 //获取子串
@@ -588,10 +587,49 @@ having:
 		condition_init_from_expr(&condition, CONTEXT->comp, $2, $4);
 		selects_setup_having_condition(&CONTEXT->ssql->sstr.selection,&condition);
 	}; 
+
+order_by_list:
+	| ORDER BY order_by_attr order_by_attr_list {};
+
+order_by_attr_list: 
+	| COMMA order_by_attr order_by_attr_list {};
+
+order_by_attr:
+	ID {
+		RelAttr attr;
+		relation_attr_init(&attr, NULL, $1);
+		selects_append_order(&CONTEXT->ssql->sstr.selection, &attr, ASC_T);
+	}
+	| ID DOT ID {
+		RelAttr attr;
+		relation_attr_init(&attr, $1, $3);
+		selects_append_order(&CONTEXT->ssql->sstr.selection, &attr, ASC_T);
+	}
+	| ID ASC {
+		RelAttr attr;
+		relation_attr_init(&attr, NULL, $1);
+		selects_append_order(&CONTEXT->ssql->sstr.selection, &attr, ASC_T);
+	}
+	| ID DOT ID ASC {
+		RelAttr attr;
+		relation_attr_init(&attr, $1, $3);
+		selects_append_order(&CONTEXT->ssql->sstr.selection, &attr, ASC_T);
+	}
+	| ID DESC {
+		RelAttr attr;
+		relation_attr_init(&attr, NULL, $1);
+		selects_append_order(&CONTEXT->ssql->sstr.selection, &attr, DESC_T);
+	}
+	| ID DOT ID DESC {
+		RelAttr attr;
+		relation_attr_init(&attr, $1, $3);
+		selects_append_order(&CONTEXT->ssql->sstr.selection, &attr, DESC_T);
+	};
+
 select:
 	
 	/*  select 语句的语法解析树*/
-    SELECT select_attr FROM ID rel_list where  SEMICOLON{
+    SELECT select_attr FROM ID rel_list where order_by_list SEMICOLON{
 			selects_append_relation(&CONTEXT->ssql->sstr.selection, $4);
 
 			selects_append_conditions(&CONTEXT->ssql->sstr.selection, CONTEXT->conditions, CONTEXT->condition_length);

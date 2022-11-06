@@ -72,9 +72,14 @@ typedef struct _Value {
   int _is_null;
 } Value;
 
+typedef enum {
+  ASC_T,
+  DESC_T,
+} OrderType;
+
 typedef struct _OrderBy {
   RelAttr attribute;  // order by this attribute
-  int     order;      // 0:asc, 1:desc
+  OrderType type;      // 0:asc, 1:desc
 } OrderBy;
 
 struct _Selects;
@@ -323,9 +328,9 @@ void Init_AggFun1(AggFun * a, DescribeFun des, const char* arr_name,const char *
 void Init_AggFun_Rel(AggFun *a, DescribeFun des, const char* rel_name, const char* arr_name);
 
 void selects_init(Selects *selects);
+void selects_append_order(Selects *selects, RelAttr *rel_attr, OrderType type);
 void selects_append_aggfun(Selects *selects, AggFun * a);
 void selects_reverse_append_aggfun(Selects *selects, AggFun * a);
-void selects_append_order(Selects *selects, RelAttr *rel_attr, int order);
 void selects_append_alias(Selects *selects, const char *name,const char *alias_name);
 void selects_append_alias2(Selects *selects, const char *name,const char *rname,const char *alias_name);
 void selects_append_alias3(Selects *selects, AggFun * a,const char* alias);
